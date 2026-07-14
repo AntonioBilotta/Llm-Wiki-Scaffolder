@@ -1,0 +1,17 @@
+# Obsidian
+.obsidian/workspace*
+.obsidian/cache
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+
+# Temp / trash
+*.tmp
+*.swp
+.trash/
