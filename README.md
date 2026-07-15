@@ -116,6 +116,46 @@ Override defaults with `--raw-folders "a,b,c"` and `--extra-wiki-folders "a,b,c"
 - **`--force`**: overwrite an existing wiki. Destructive.
 - **`--upgrade`**: fill only missing files in `.github/`. Never touches `wiki/`, `raw/`, `AGENTS.md`, `.gitignore`. Use this when the template evolves and you want to bring an existing vault up-to-date without disturbing its content.
 
+## Future ideas
+
+Open directions considered and deferred. Not roadmap commitments — just parking notes so we don't rediscover the same trade-offs later.
+
+### Skill wrapper (Copilot workspace-level, and/or Claude Code user-level)
+
+Both VS Code Copilot and Claude Code support the `SKILL.md` format with bundled `references/` assets and autonomous invocation (LLM decides to invoke based on the skill's `description`, no explicit slash command needed).
+
+- **Copilot skills** live at `.github/skills/<name>/` or `.claude/skills/<name>/` and are **workspace-scoped only** — no user-level equivalent. Adopting for Copilot would trade the current "install once, use everywhere" flow for per-workspace copies. Not worth it unless we also automate per-workspace sync.
+- **Claude Code skills** live at `~/.claude/skills/<name>/` and **are user-level**. Adding a Claude skill alongside the Copilot prompt would give autonomous invocation on that host with a ~150-line wrapper that delegates to the same `scaffold.py`. Only useful if we start using Claude Code as an alternative surface.
+
+For now the Copilot prompt covers the primary use case. Revisit if the prompt grows past ~400 lines or if we adopt Claude Code routinely.
+
+### Sidecar `references/` modularity (in the current prompt)
+
+Even without switching to skill format, we can steal the skill pattern of moving long-form content into on-demand files that the LLM reads when needed. Candidates in the current prompt:
+
+- The "Domain notes" table (Section 5b) → `~/.config/llm-wiki/references/domain_notes.md`
+- Detailed per-domain conventions → `~/.config/llm-wiki/references/domain_conventions.md`
+- Any future per-domain checklist or long-form guidance
+
+Trigger: do this when the prompt exceeds ~300 lines or when adding a new domain makes the tables unwieldy.
+
+### One-liner install (`curl | bash`)
+
+Currently install is `git clone + ./bin/install.sh`. A `install-remote.sh` published at a stable URL would let users skip the clone:
+
+```
+curl -fsSL https://<host>/install-remote.sh | bash
+```
+
+Trade-off: `curl | bash` is a common security anti-pattern from the user's perspective (running remote code sight-unseen). If we add it, we document the clone-first alternative in the same README for users who want to review the code first.
+
+### Distribution alternatives
+
+- **PyPI package** (`uv tool install llm-wiki-scaffolder`) — clean, but freezes templates into the package (breaks the "edit template, re-install, iterate" fast loop) and doesn't handle the Copilot prompt file. Deferred until user base grows enough to justify PyPI account + versioning.
+- **Homebrew tap** — over-engineered for a personal-scale tool. Not planned.
+- **VS Code Extension** — huge development cost, unnecessary since prompts and skills already do the job. Not planned.
+
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
