@@ -1,6 +1,6 @@
 ---
 description: "Ingest one or more sources from `raw/` INTO the LLM Wiki located in `wiki/`. Creates and updates entity/concept/source/analysis pages, maintains cross-references, flags contradictions. Supports single-source and batch (folder) mode. Use when the user asks to ingest, add, or process a source for the wiki."
-tools: [read, edit, search]
+tools: [read, edit, search, agent]
 agents: [wiki-auditor]
 ---
 
