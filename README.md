@@ -4,6 +4,8 @@ Deterministic scaffolder for **LLM Wiki** vaults following the [Karpathy pattern
 
 An LLM Wiki is a persistent, LLM-maintained knowledge base: `raw/` holds immutable sources, `wiki/` holds LLM-owned markdown (entities, concepts, sources, analysis, plus domain-specific folders), and the LLM keeps the wiki up-to-date as new sources are added. Three commands drive it: `/wiki-ingest`, `/wiki-lint`, `@wiki-reader`.
 
+For the design rationale and the deterministic/LLM boundary, see [ARCHITECTURE.md](ARCHITECTURE.md); individual design decisions are recorded as ADRs under [docs/decisions/](docs/decisions/).
+
 ## Install
 
 ```
@@ -116,6 +118,20 @@ Override defaults with `--raw-folders "a,b,c"` and `--extra-wiki-folders "a,b,c"
 - **`--force`**: overwrite an existing wiki. Destructive.
 - **`--upgrade`**: fill only missing files in `.github/`. Never touches `wiki/`, `raw/`, `AGENTS.md`, `.gitignore`. Use this when the template evolves and you want to bring an existing vault up-to-date without disturbing its content.
 
+## Working with the vault
+
+Once scaffolded, a vault exposes two slash-commands and three role agents. Full rationale in [ADR-0005](docs/decisions/0005-prompt-vs-agent-invocation.md); quick reference:
+
+| Situation | Tool |
+|---|---|
+| Add *this* source to the wiki | `/wiki-ingest <path>` |
+| Run periodic health check | `/wiki-lint` |
+| Discuss before writing; non-ingest maintenance op | `@wiki-maintainer` |
+| Audit only *these* pages / *this* aspect | `@wiki-auditor` |
+| Ask a question against the wiki | `@wiki-reader` |
+
+**Prompt = verb, agent = subject.** Slash-commands are canonical, one-shot rituals with `argument-hint` and log entries (`## [date] ingest \| ...` / `## [date] lint \| ...`). Mentions are role-based conversations, used off the canonical path.
+
 ## Future ideas
 
 Open directions considered and deferred. Not roadmap commitments — just parking notes so we don't rediscover the same trade-offs later.
@@ -129,6 +145,8 @@ Both VS Code Copilot and Claude Code support the `SKILL.md` format with bundled 
 
 For now the Copilot prompt covers the primary use case. Revisit if the prompt grows past ~400 lines or if we adopt Claude Code routinely.
 
+See [ADR-0002](docs/decisions/0002-user-level-prompt-not-skill.md) for the scaffold command choice and [ADR-0007](docs/decisions/0007-ingest-lint-remain-prompts.md) for why `/wiki-ingest` and `/wiki-lint` stay prompts too.
+
 ### Sidecar `references/` modularity (in the current prompt)
 
 Even without switching to skill format, we can steal the skill pattern of moving long-form content into on-demand files that the LLM reads when needed. Candidates in the current prompt:
@@ -137,7 +155,7 @@ Even without switching to skill format, we can steal the skill pattern of moving
 - Detailed per-domain conventions → `~/.config/llm-wiki/references/domain_conventions.md`
 - Any future per-domain checklist or long-form guidance
 
-Trigger: do this when the prompt exceeds ~300 lines or when adding a new domain makes the tables unwieldy.
+Trigger: do this when the prompt exceeds ~300 lines or when adding a new domain makes the tables unwieldy. Cross-referenced from [ADR-0007](docs/decisions/0007-ingest-lint-remain-prompts.md).
 
 ### One-liner install (`curl | bash`)
 
@@ -154,6 +172,8 @@ Trade-off: `curl | bash` is a common security anti-pattern from the user's persp
 - **PyPI package** (`uv tool install llm-wiki-scaffolder`) — clean, but freezes templates into the package (breaks the "edit template, re-install, iterate" fast loop) and doesn't handle the Copilot prompt file. Deferred until user base grows enough to justify PyPI account + versioning.
 - **Homebrew tap** — over-engineered for a personal-scale tool. Not planned.
 - **VS Code Extension** — huge development cost, unnecessary since prompts and skills already do the job. Not planned.
+
+Related: [ADR-0001](docs/decisions/0001-python-stdlib-only.md) explains why the current stdlib-only design blocks the PyPI path in particular.
 
 
 ## License
