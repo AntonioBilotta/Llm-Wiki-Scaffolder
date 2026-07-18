@@ -52,7 +52,7 @@ _Active projects and workstreams. Each has its own page under `wiki/initiatives/
 
 ## Open decisions
 
-_Decisions currently under discussion. Once resolved, they migrate to `wiki/analysis/` as decision records._
+_Decisions currently under discussion or recently resolved. Kept in-place with status; no migration to a separate folder._
 
 ## Suggested first questions
 
