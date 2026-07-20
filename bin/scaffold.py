@@ -35,7 +35,18 @@ from typing import Dict, List, Optional, Tuple
 # ---------------------------------------------------------------------------
 
 TEMPLATES_ENV = "LLM_WIKI_TEMPLATES"
-DEFAULT_TEMPLATES = Path.home() / ".config" / "llm-wiki" / "templates"
+
+# Cross-platform default templates directory:
+#   Windows:  %APPDATA%\llm-wiki\templates
+#   Unix:     ~/.config/llm-wiki/templates
+if sys.platform == "win32":
+    _appdata = os.environ.get("APPDATA")
+    if _appdata:
+        DEFAULT_TEMPLATES = Path(_appdata) / "llm-wiki" / "templates"
+    else:
+        DEFAULT_TEMPLATES = Path.home() / ".config" / "llm-wiki" / "templates"
+else:
+    DEFAULT_TEMPLATES = Path.home() / ".config" / "llm-wiki" / "templates"
 WIKI_MARKER = "LLM Wiki"  # marker string in .github/copilot-instructions.md
 
 # Domain configurations. Keys are the internal domain type identifiers.

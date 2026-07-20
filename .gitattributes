@@ -1,0 +1,17 @@
+# Handle line endings automatically
+* text=auto
+
+# Shell scripts must use LF line endings
+*.sh text eol=lf
+
+# PowerShell scripts can use CRLF on checkout
+*.ps1 text eol=crlf
+
+# Python scripts should use LF for cross-platform compatibility
+*.py text eol=lf
+
+# Markdown and config files
+*.md text
+*.yml text
+*.yaml text
+*.json text
