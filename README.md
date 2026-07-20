@@ -96,7 +96,7 @@ git pull
 .\bin\install.ps1
 ```
 
-Idempotent: templates are synced (`rsync --delete` on Unix, `Copy-Item` on Windows), the script and prompt are re-installed.
+Idempotent: templates are synced (`rsync --delete` on Unix, `Copy-Item` on Windows), the script and prompt are re-installed. No user state in the install directory is preserved between runs — edit the repo, not the runtime copy.
 
 ## Uninstall
 

@@ -1,7 +1,7 @@
 # ADR-0008: Windows support
 
 ## Status
-Proposed (2026-01)
+Accepted (2026-01)
 
 ## Context
 

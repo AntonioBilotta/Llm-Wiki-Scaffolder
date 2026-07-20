@@ -46,7 +46,7 @@ $ErrorActionPreference = "Stop"
 # Locate repo and prerequisites
 # ---------------------------------------------------------------------------
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
+$ScriptDir = $PSScriptRoot
 $RepoRoot = Split-Path -Parent $ScriptDir
 
 $ScaffoldPy = Join-Path $RepoRoot "bin\scaffold.py"
@@ -57,7 +57,7 @@ if (-not (Test-Path $ScaffoldPy)) {
 
 # Check for Python
 $PythonCmd = $null
-foreach ($cmd in @("python3", "python", "py")) {
+foreach ($cmd in @("py", "python", "python3")) {
     try {
         $null = & $cmd --version 2>&1
         $PythonCmd = $cmd
@@ -163,7 +163,7 @@ New-Item -ItemType Directory -Force -Path $InstallTemplates | Out-Null
 # Templates: sync (remove old, copy new) — equivalent to rsync --delete
 # First remove existing templates to ensure clean state
 if (Test-Path $InstallTemplates) {
-    Get-ChildItem $InstallTemplates -Recurse | Remove-Item -Recurse -Force
+    Remove-Item -Path "$InstallTemplates\*" -Recurse -Force
 }
 
 # Copy templates, excluding OS junk
