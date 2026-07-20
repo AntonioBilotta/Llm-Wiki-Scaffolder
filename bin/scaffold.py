@@ -41,7 +41,10 @@ TEMPLATES_ENV = "LLM_WIKI_TEMPLATES"
 #   Unix:     ~/.config/llm-wiki/templates
 if sys.platform == "win32":
     _appdata = os.environ.get("APPDATA")
-    DEFAULT_TEMPLATES = Path(_appdata) / "llm-wiki" / "templates" if _appdata else Path.home() / ".config" / "llm-wiki" / "templates"
+    if _appdata:
+        DEFAULT_TEMPLATES = Path(_appdata) / "llm-wiki" / "templates"
+    else:
+        DEFAULT_TEMPLATES = Path.home() / ".config" / "llm-wiki" / "templates"
 else:
     DEFAULT_TEMPLATES = Path.home() / ".config" / "llm-wiki" / "templates"
 WIKI_MARKER = "LLM Wiki"  # marker string in .github/copilot-instructions.md

@@ -55,6 +55,12 @@ if (-not (Test-Path $ScaffoldPy)) {
     exit 1
 }
 
+$PromptSource = Join-Path $RepoRoot "prompts\new_llm_wiki_vault.prompt.md"
+if (-not (Test-Path $PromptSource)) {
+    Write-Error "Missing prompt file at $PromptSource"
+    exit 1
+}
+
 # Check for Python
 $PythonCmd = $null
 foreach ($cmd in @("py", "python", "python3")) {
@@ -161,10 +167,9 @@ New-Item -ItemType Directory -Force -Path $InstallBin | Out-Null
 New-Item -ItemType Directory -Force -Path $InstallTemplates | Out-Null
 
 # Templates: sync (remove old, copy new) — equivalent to rsync --delete
-# First remove existing templates to ensure clean state
-if (Test-Path $InstallTemplates) {
-    Remove-Item -Path "$InstallTemplates\*" -Recurse -Force
-}
+# First remove existing templates to ensure clean state.
+# $InstallTemplates was just created by New-Item -Force above, so it exists.
+Remove-Item -Path "$InstallTemplates\*" -Recurse -Force
 
 # Copy templates, excluding OS junk
 $TemplatesSource = Join-Path $RepoRoot "templates"
@@ -188,12 +193,8 @@ Get-ChildItem $TemplatesSource -Recurse |
 Copy-Item -Force $ScaffoldPy $InstallScaffold
 
 # Prompt: copy to VS Code user prompts folder
+# ($PromptSource existence was validated at prerequisites time.)
 if (-not $NoPrompt) {
-    $PromptSource = Join-Path $RepoRoot "prompts\new_llm_wiki_vault.prompt.md"
-    if (-not (Test-Path $PromptSource)) {
-        Write-Error "Missing prompt file at $PromptSource"
-        exit 1
-    }
     New-Item -ItemType Directory -Force -Path $VSCodePromptsDir | Out-Null
     Copy-Item -Force $PromptSource $InstallPrompt
 }
@@ -206,7 +207,7 @@ Write-Host ""
 Write-Host "Verifying install..."
 
 try {
-    $helpOutput = & $PythonCmd $InstallScaffold --help 2>&1
+    $null = & $PythonCmd $InstallScaffold --help 2>&1
     if ($LASTEXITCODE -ne 0) {
         throw "scaffold.py --help failed"
     }

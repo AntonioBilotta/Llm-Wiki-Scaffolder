@@ -70,10 +70,10 @@ The scaffolder also runs standalone:
     --desc "SaaS auth service" --lang english
 ```
 
-**Windows:**
+**Windows:** (use `py` if the Python launcher is installed, otherwise `python`)
 ```powershell
-python $env:APPDATA\llm-wiki\bin\scaffold.py --help
-python $env:APPDATA\llm-wiki\bin\scaffold.py `
+py $env:APPDATA\llm-wiki\bin\scaffold.py --help
+py $env:APPDATA\llm-wiki\bin\scaffold.py `
     --path C:\Vaults\proj --name "MyProj" --type development `
     --desc "SaaS auth service" --lang english
 ```

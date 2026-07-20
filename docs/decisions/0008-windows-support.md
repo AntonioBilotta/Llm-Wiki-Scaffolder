@@ -8,7 +8,7 @@ Accepted (2026-01)
 The original scaffolder targeted macOS and Linux only:
 - `install.sh` relies on `rsync` (rarely available on Windows by default)
 - `scaffold.py` hardcoded `~/.config/llm-wiki/` as the templates directory
-- VS Code prompts path assumed Unix-style `~/.vscode/` locations
+- VS Code prompts path assumed Unix-style locations (`~/.config/Code/User/prompts/` on Linux, `~/Library/Application Support/Code/User/prompts/` on macOS)
 
 Windows developers with VS Code + Copilot Chat were unable to use the scaffolder without WSL or manual adaptation.
 
@@ -17,7 +17,7 @@ Windows developers with VS Code + Copilot Chat were unable to use the scaffolder
 Add native Windows support alongside the existing Unix installer:
 
 1. **New PowerShell installer** (`bin/install.ps1`):
-   - Uses `Copy-Item -Recurse` instead of `rsync`
+   - Copies template files recursively (via `Get-ChildItem | Copy-Item`) while excluding OS junk (`.DS_Store`, `Thumbs.db`, `.git*`) — the filtering pipeline replaces `rsync`
    - Targets `%APPDATA%\llm-wiki\` for templates and script
    - Detects VS Code (stable or Insiders) prompts folder at `%APPDATA%\Code\User\prompts\`
    - Supports `-Uninstall` and `-Insiders` flags for parity with Bash installer
