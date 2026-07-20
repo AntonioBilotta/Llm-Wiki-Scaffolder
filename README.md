@@ -8,20 +8,40 @@ For the design rationale and the deterministic/LLM boundary, see [ARCHITECTURE.m
 
 ## Install
 
-```
+### macOS / Linux
+
+```bash
 git clone https://github.com/<owner>/llm-wiki-scaffolder ~/llm-wiki-scaffolder
 cd ~/llm-wiki-scaffolder
 ./bin/install.sh
 ```
 
-Then reload the VS Code window (`Cmd/Ctrl+Shift+P → Developer: Reload Window`). The command `/new_llm_wiki_vault` is now available in Copilot Chat from **any** workspace.
+Prerequisites: Python 3.8+, `rsync`, `git`, VS Code with GitHub Copilot Chat.
 
-Prerequisites: Python 3.8+, `rsync`, `git`, VS Code with GitHub Copilot Chat. macOS and Linux supported (no Windows).
+### Windows
+
+```powershell
+git clone https://github.com/<owner>/llm-wiki-scaffolder $env:USERPROFILE\llm-wiki-scaffolder
+cd $env:USERPROFILE\llm-wiki-scaffolder
+.\bin\install.ps1
+```
+
+Prerequisites: Python 3.8+, `git`, VS Code with GitHub Copilot Chat.
+
+---
+
+Then reload the VS Code window (`Cmd/Ctrl+Shift+P → Developer: Reload Window`). The command `/new_llm_wiki_vault` is now available in Copilot Chat from **any** workspace.
 
 ### VS Code Insiders
 
-```
+**macOS / Linux:**
+```bash
 ./bin/install.sh --insiders
+```
+
+**Windows:**
+```powershell
+.\bin\install.ps1 -Insiders
 ```
 
 ## Usage
@@ -42,10 +62,19 @@ The prompt orchestrates a deterministic Python script for filesystem work and on
 
 The scaffolder also runs standalone:
 
-```
+**macOS / Linux:**
+```bash
 ~/.config/llm-wiki/bin/scaffold.py --help
 ~/.config/llm-wiki/bin/scaffold.py \
     --path ~/vaults/proj --name "MyProj" --type development \
+    --desc "SaaS auth service" --lang english
+```
+
+**Windows:**
+```powershell
+python $env:APPDATA\llm-wiki\bin\scaffold.py --help
+python $env:APPDATA\llm-wiki\bin\scaffold.py `
+    --path C:\Vaults\proj --name "MyProj" --type development `
     --desc "SaaS auth service" --lang english
 ```
 
@@ -53,21 +82,35 @@ Useful for scripting, CI, or when Copilot is not available.
 
 ## Update
 
-```
+**macOS / Linux:**
+```bash
 cd ~/llm-wiki-scaffolder
 git pull
 ./bin/install.sh
 ```
 
-Idempotent: templates are synced with `rsync --delete`, the script and prompt are re-installed. No user state in `~/.config/llm-wiki/` is preserved between runs — edit the repo, not the runtime copy.
+**Windows:**
+```powershell
+cd $env:USERPROFILE\llm-wiki-scaffolder
+git pull
+.\bin\install.ps1
+```
+
+Idempotent: templates are synced (`rsync --delete` on Unix, `Copy-Item` on Windows), the script and prompt are re-installed.
 
 ## Uninstall
 
-```
+**macOS / Linux:**
+```bash
 ./bin/install.sh --uninstall
 ```
 
-Removes `~/.config/llm-wiki/` and the VS Code user prompt. Vaults created with the scaffolder are untouched.
+**Windows:**
+```powershell
+.\bin\install.ps1 -Uninstall
+```
+
+Removes installed files and the VS Code user prompt. Vaults created with the scaffolder are untouched.
 
 ## What gets created in a vault
 
