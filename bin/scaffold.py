@@ -161,6 +161,19 @@ DOMAIN_CONFIGS: Dict[str, Dict] = {
 
 BASE_TYPES = ["research", "development", "reading", "personal", "business", "learning", "hobby"]
 
+# Domains for which `.github/agents/` is created by default (opt-out via --minimal).
+# Rationale (per ADR-0009 Model D, resolved decision on domain-based defaults):
+# domains with strict role guardrails benefit from platform-enforced tool restriction;
+# casual/exploratory domains work fine with just user-level prompts+skills.
+DOMAINS_WITH_AGENTS_BY_DEFAULT = {
+    "research",
+    "development",
+    "reading_fiction",
+    "reading_nonfiction",
+    "personal",
+    "business",
+}
+
 USAGE = """\
 Usage:
   scaffold.py --path <vault> --name "<name>" --type <type> --desc "<desc>" --lang <lang> [options]
@@ -184,8 +197,16 @@ Reading subvariant (required when --type reading):
 Optional:
   --raw-folders "a,b,c"           Override default raw/ subfolders
   --extra-wiki-folders "a,b,c"    Override default extra wiki/ subfolders
+  --minimal                        Scaffold without .github/agents/ (use only user-level skills)
+  --with-agents                    Force include .github/agents/ (opt-in to role guardrails)
+                                   Defaults: agents included for research, development,
+                                   reading (fiction/nonfiction), personal, business;
+                                   omitted for learning, hobby. Use these flags to override.
   --force                          Overwrite existing vault content
   --upgrade                        Only fill missing .github/ files; never overwrite
+                                   Also removes any pre-Model-D vault-level prompts
+                                   (.github/prompts/wiki-*.prompt.md with `agent:` frontmatter),
+                                   which are now redundant with user-level installs.
   --seed <path>                    Copy a starter source into raw/<domain-default>/
   --dry-run                        Print plan, touch nothing on disk
   --detect-only                    Report vault state as JSON, exit
@@ -388,19 +409,21 @@ def render_index(project_name: str, extra_wiki_folders: List[str], today: str) -
     return "\n".join(lines)
 
 
-def render_log(project_name: str, raw_folders: List[str], extra_wiki_folders: List[str], today: str) -> str:
+def render_log(project_name: str, raw_folders: List[str], extra_wiki_folders: List[str], today: str, include_agents: bool) -> str:
     """Generate wiki/log.md content with the init entry."""
     raw_list = ", ".join(raw_folders + ["assets"])
     wiki_extras = ", ".join(["entities", "concepts"] + extra_wiki_folders + ["sources", "analysis"])
+    customization = "copilot-instructions.md, instructions/wiki-conventions"
+    if include_agents:
+        customization += ", agents/wiki-{reader,maintainer,auditor}"
     return (
         f"# Log — {project_name}\n"
         f"\n"
         f"## [{today}] init | Wiki creation\n"
         f"Pages created: [[overview]], [[index]]\n"
         f"Structure initialized: raw/ ({raw_list}), wiki/ ({wiki_extras})\n"
-        f"Customization: .github/ (copilot-instructions.md, "
-        f"instructions/wiki-conventions, agents/wiki-{{reader,maintainer,auditor}}, "
-        f"prompts/wiki-{{ingest,lint}})\n"
+        f"Customization: .github/ ({customization}). Operational commands (/wiki-ingest, "
+        f"/wiki-lint, /wiki-query) come from user-level install — see .github/copilot-instructions.md.\n"
     )
 
 
@@ -449,6 +472,63 @@ def apply_file(op: FileOp, mode: str, dry_run: bool) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Legacy migration (Model D)
+# ---------------------------------------------------------------------------
+
+
+def _has_agent_frontmatter(content: str) -> bool:
+    """True if the prompt content has `agent: ...` in its YAML frontmatter.
+    Signals a pre-Model-D delegator prompt that is now redundant with the
+    user-level installation."""
+    if not content.startswith("---"):
+        return False
+    lines = content.split("\n")
+    end_idx: Optional[int] = None
+    for i, line in enumerate(lines[1:], start=1):
+        if line.strip() == "---":
+            end_idx = i
+            break
+    if end_idx is None:
+        return False
+    for line in lines[1:end_idx]:
+        if line.startswith("agent:"):
+            return True
+    return False
+
+
+def cleanup_legacy_prompts(vault: Path, mode: str, dry_run: bool) -> List[str]:
+    """In --upgrade mode, remove vault-level `.github/prompts/wiki-*.prompt.md`
+    files that predate Model D (ADR-0009). Only files with `agent:` frontmatter
+    are removed — self-contained prompts (user-customized) are preserved.
+
+    Returns the list of removed absolute paths (for JSON output).
+    """
+    if mode != "upgrade":
+        return []
+    prompts_dir = vault / ".github" / "prompts"
+    if not prompts_dir.is_dir():
+        return []
+    removed: List[str] = []
+    for prompt_file in sorted(prompts_dir.glob("wiki-*.prompt.md")):
+        try:
+            content = prompt_file.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        if _has_agent_frontmatter(content):
+            if not dry_run:
+                prompt_file.unlink()
+            removed.append(str(prompt_file))
+    # If prompts/ is now empty, remove it too (leaves a clean .github/).
+    if not dry_run and prompts_dir.is_dir():
+        try:
+            prompts_dir.rmdir()
+            removed.append(str(prompts_dir) + "/")
+        except OSError:
+            pass  # not empty (contains user files), leave it.
+    return removed
+
+
+# ---------------------------------------------------------------------------
 # Plan construction
 # ---------------------------------------------------------------------------
 
@@ -462,6 +542,7 @@ def build_plan(
     extra_wiki_folders: List[str],
     today: str,
     project_name: str,
+    include_agents: bool,
 ) -> Tuple[List[Path], List[FileOp]]:
     """Compute the deterministic set of directories and file operations."""
     dirs: List[Path] = [
@@ -471,9 +552,12 @@ def build_plan(
         vault / "wiki" / "sources",
         vault / "wiki" / "analysis",
         vault / ".github" / "instructions",
-        vault / ".github" / "agents",
-        vault / ".github" / "prompts",
     ]
+    if include_agents:
+        dirs.append(vault / ".github" / "agents")
+    # NOTE: `.github/prompts/` is NOT created under Model D (ADR-0009). The wiki-*
+    # prompts live at user-level (installed by bin/install.sh into VS Code User
+    # prompts folder). Only the scaffold command (/new-llm-wiki) is user-level too.
     for f in raw_folders:
         dirs.append(vault / "raw" / f)
     for f in extra_wiki_folders:
@@ -521,17 +605,16 @@ def build_plan(
         "text",
     ))
     for agent in ("wiki-reader.agent.md", "wiki-maintainer.agent.md", "wiki-auditor.agent.md"):
+        if not include_agents:
+            continue
         ops.append(FileOp(
             vault / ".github" / "agents" / agent,
             substitute((templates_dir / "agents" / agent).read_text(encoding="utf-8"), mapping),
             "text",
         ))
-    for prompt in ("wiki-ingest.prompt.md", "wiki-lint.prompt.md"):
-        ops.append(FileOp(
-            vault / ".github" / "prompts" / prompt,
-            (templates_dir / "prompts" / prompt).read_text(encoding="utf-8"),
-            "text",
-        ))
+    # Vault-level prompts intentionally NOT created (Model D — see ADR-0009).
+    # If a legacy .github/prompts/ exists on an --upgrade path, it is cleaned up
+    # by cleanup_legacy_prompts() in main().
 
     # wiki/ navigation files.
     overview_template = templates_dir / "overview" / config["overview_template"]
@@ -549,7 +632,7 @@ def build_plan(
     ))
     ops.append(FileOp(
         vault / "wiki" / "log.md",
-        render_log(project_name, raw_folders, extra_wiki_folders, today),
+        render_log(project_name, raw_folders, extra_wiki_folders, today, include_agents),
         "text",
     ))
 
@@ -627,6 +710,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--nonfiction", dest="nonfiction", action="store_true")
     p.add_argument("--raw-folders", dest="raw_folders")
     p.add_argument("--extra-wiki-folders", dest="extra_wiki_folders")
+    p.add_argument("--minimal", dest="minimal", action="store_true")
+    p.add_argument("--with-agents", dest="with_agents", action="store_true")
     p.add_argument("--force", dest="force", action="store_true")
     p.add_argument("--upgrade", dest="upgrade", action="store_true")
     p.add_argument("--seed", dest="seed")
@@ -687,6 +772,9 @@ def main(argv: Optional[List[str]] = None) -> int:
     if args.force and args.upgrade:
         die("--force and --upgrade are mutually exclusive.", json_out=args.json_out)
 
+    if args.minimal and args.with_agents:
+        die("--minimal and --with-agents are mutually exclusive.", json_out=args.json_out)
+
     # Determine mode.
     warnings: List[str] = []
     if state_info["state"] == "existing_llm_wiki":
@@ -727,6 +815,14 @@ def main(argv: Optional[List[str]] = None) -> int:
     internal_type = resolve_type(args.type, args.fiction, args.nonfiction)
     config = DOMAIN_CONFIGS[internal_type]
 
+    # Resolve whether to include vault-level agents.
+    if args.minimal:
+        include_agents = False
+    elif args.with_agents:
+        include_agents = True
+    else:
+        include_agents = internal_type in DOMAINS_WITH_AGENTS_BY_DEFAULT
+
     raw_folders = (
         [f.strip() for f in args.raw_folders.split(",") if f.strip()]
         if args.raw_folders else config["raw_folders"]
@@ -759,6 +855,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         extra_wiki_folders=extra_wiki_folders,
         today=today,
         project_name=args.name,
+        include_agents=include_agents,
     )
 
     seed_op: Optional[FileOp] = None
@@ -786,6 +883,10 @@ def main(argv: Optional[List[str]] = None) -> int:
         else:
             files_skipped.append(rel)
 
+    # Legacy migration: in --upgrade mode, remove pre-Model-D vault-level
+    # prompts (they are redundant with the user-level install).
+    files_removed = cleanup_legacy_prompts(vault, mode, args.dry_run)
+
     payload = {
         "status": "ok",
         "mode": mode,
@@ -793,11 +894,13 @@ def main(argv: Optional[List[str]] = None) -> int:
         "domain_type": args.type,
         "internal_type": internal_type,
         "language": args.lang,
+        "include_agents": include_agents,
         "raw_folders": raw_folders,
         "extra_wiki_folders": extra_wiki_folders,
         "files_created": files_created,
         "files_overwritten": files_overwritten,
         "files_skipped": files_skipped,
+        "files_removed": files_removed,
         "seed_path_final": str(seed_op.dest) if seed_op else None,
         "dry_run": args.dry_run,
         "warnings": warnings,
