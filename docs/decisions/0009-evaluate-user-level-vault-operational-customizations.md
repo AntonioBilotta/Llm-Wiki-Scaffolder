@@ -7,17 +7,21 @@ Proposed (2026-07)
 
 The original text of this ADR (below) repeatedly claimed that agents provide **"platform-enforced tool restriction"** by listing user-level skills in their `tools:` frontmatter (e.g. reader's `tools:` excluding `wiki-write-source-page`). This claim is **incorrect**.
 
-VS Code Copilot's `tools:` frontmatter is an allowlist of **real tool IDs** (platform tools like `read_file`, `grep_search`, `replace_string_in_file`, `run_in_terminal`; VS Code toolset group names; MCP/extension tool IDs). It does NOT accept skill names. Skills are a different mechanism — `SKILL.md` files auto-loaded as instructions when their `description` matches the current task semantically; they are playbooks, not endpoints.
+VS Code Copilot's `tools:` frontmatter is an allowlist of **toolset names** (`codebase`, `search`, `editFiles`, `runCommands`, `agent`, …) or namespaced tool IDs (`search/codebase`, `edit/editFiles`, `execute/runInTerminal`, `read/terminalLastCommand`, …). It does NOT accept skill names. Skills are a different mechanism — `SKILL.md` files auto-loaded as instructions when their `description` matches the current task semantically; they are playbooks, not endpoints.
 
-Consequence: our Phase C agent templates (and the initially deployed vault agents) listed skill names in `tools:`, which VS Code silently dropped, effectively leaving the agents **unrestricted** — the opposite of the intent.
+Consequence: our Phase C agent templates (and the initially deployed vault agents) listed skill names in `tools:`, which VS Code silently dropped, effectively leaving the agents **unrestricted** — the opposite of the intent. An intermediate Phase C++ fix using individual tool IDs (`read_file`, `create_file`, `run_in_terminal`) partially worked in VS Code Agent Mode but failed in Copilot CLI where several IDs were silently dropped.
 
-**Correction applied post-Phase C (Phase C++):**
+**Final correction (Phase C+++, validated end-to-end via `/wiki-ingest` pilot):**
 
-- Agent templates now list real tool IDs: reader `[read_file, grep_search, file_search, list_dir, semantic_search, run_in_terminal]`; maintainer adds `[replace_string_in_file, multi_replace_string_in_file, create_file]`; auditor adds `[replace_string_in_file, multi_replace_string_in_file]` (deliberately no `create_file`).
+- Agent templates now use canonical toolset names (mix of namespaced and short form both accepted):
+  - **reader**: `tools: ['search/codebase', 'search', 'execute/getTerminalOutput', 'execute/runInTerminal', 'read/terminalLastCommand', 'read/terminalSelection']` — deliberately no `edit/editFiles` → runtime-enforced read-only for wiki content; archival writes go through skill Python scripts via the terminal toolsets.
+  - **maintainer**: `tools: ['codebase', 'search', 'editFiles', 'runCommands', 'agent']` + `agents: [wiki-auditor]` — `agent` toolset in `tools:` is REQUIRED (per docs) for subagent dispatch, in addition to the top-level `agents:` field.
+  - **auditor**: `tools: ['search/codebase', 'search', 'edit/editFiles', 'execute/getTerminalOutput', 'execute/runInTerminal', 'read/terminalLastCommand', 'read/terminalSelection']` — has `editFiles` for callouts + frontmatter auto-repair; "no create new pages" restriction stays prompt-body only (toolset granularity cannot express "edit but not create").
 - Skills are referenced in agent bodies via "apply the `X` skill" wording — not "invoke `X`" — to reflect the playbook semantics.
-- Subagent invocation uses the separate `agents:` frontmatter field (already correct), e.g. `agents: [wiki-auditor]` on the maintainer.
+- **Runtime caveat**: `/wiki-*` prompts (having no `tools:` field of their own) inherit the current chat mode's toolset. Running `/wiki-ingest` in **Ask Mode** or **Copilot CLI without proper permissions** = no write tools regardless of what `@wiki-maintainer`'s frontmatter says. INGEST/LINT workflows require **Agent Mode**.
+- **UX trade-off observed in pilot**: user-level skill Python scripts (under `~/.agents/skills/*/scripts/`) trigger Copilot CLI permission prompts each invocation (path-outside-workspace + terminal command + create-file in new subdirs). Once "always allow" is granted per pattern the friction disappears, but first-run UX is noisy. This is the cost of the composability + blast-radius safety this ADR chose.
 
-The **conclusion of ADR-0009 stands**: Model D + Variant α remains the chosen architecture. Only the enforcement claim about `tools:` needed correction. Real tool-ID allowlisting still gives us the read-only vs write distinction that Model D depends on.
+The **conclusion of ADR-0009 stands**: Model D + Variant α remains the chosen architecture. Only the enforcement mechanism claim needed correction. Toolset-name allowlisting gives us the runtime-enforced read-only vs write distinction that Model D depends on.
 
 ## Context
 
