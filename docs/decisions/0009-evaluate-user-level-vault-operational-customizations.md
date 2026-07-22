@@ -20,13 +20,9 @@ Each file receives placeholder substitution (`{{PROJECT_NAME}}`, `{{DOMAIN_TYPE}
 1. **Template drift across vaults.** When the templates evolve, older vaults keep the old versions until the user runs `--upgrade` explicitly on each one. The `--upgrade` mode exists precisely because of this problem.
 2. **Duplication of essentially-generic content.** The operational agents (reader/maintainer/auditor) and prompts (`/wiki-ingest`, `/wiki-lint`) contain almost no vault-specific information — only `{{PROJECT_NAME}}` interpolation. The vast majority of every file is identical across every scaffolded vault.
 
-An alternative architecture — one hinted at by observation and confirmed by research (see below) — is to **install the generic operational files once at user level**, and keep only the project-specific parameters at vault level. The vault would then contain:
+An alternative architecture — one hinted at by observation and confirmed by research (see below) — is to **install some or all of the operational files at user level** so that the vault-invariant parts are shared across every vault, while vault-specific parts remain in-place. Multiple concrete splits are possible; the Decision section below chooses one after evaluating them against the concrete pain point that triggered the ADR.
 
-- `raw/` and `wiki/` (unchanged)
-- A small manifest (name, domain type, extra folders, extra page types, domain conventions, language) at vault level
-- No copies of the operational customizations
-
-The generic customizations at user level would read the manifest at runtime and behave as if they were project-specific.
+Additional driver (surfaced during discussion): the project is used in **VS Code multi-root workspaces alongside other tools that operate via Copilot skills** (e.g. OpenSpec). Those tools need to invoke wiki operations programmatically from folders where the wiki vault is not the active workspace. The current all-vault-level architecture makes this hard: agents and prompts in one folder's `.github/` are not visible to Copilot CLI running in another folder.
 
 Before committing to (or rejecting) this migration, we need to answer two questions:
 
@@ -35,13 +31,21 @@ Before committing to (or rejecting) this migration, we need to answer two questi
 
 ## Decision
 
-**Adopt the "generic at user-level + specific at vault-level" split as the target architecture, but stage the migration behind a pilot.** This ADR does *not* immediately restructure the templates. It records:
+**Adopt Model D as the target architecture, staged behind a pilot.**
 
-- The evidence that the pattern is canonical and well-supported.
-- The design shape of the target architecture.
-- A staged rollout plan: pilot on one existing vault, measure the real cost of the trade-offs, then decide whether to generalize.
+Model D splits customizations along three independent layers, each self-contained and functional without the others:
 
-If the pilot confirms the benefits without unacceptable degradation, a follow-up ADR (0010) will document the concrete migration steps and mark this ADR's decision as executed. If the pilot reveals blocking issues, an ADR-0010 will document the rejection with the observed evidence.
+1. **Skills at user-level** (`~/.copilot/skills/`, `~/.claude/skills/`, `~/.agents/skills/`) — atomic capabilities (search, read-page, summarize-source, write-analysis, append-log, update-index, detect-vault). No knowledge of role, no multi-step workflow. Portable across VS Code chat, Copilot CLI, cloud agent, and callable from third-party skills such as OpenSpec.
+
+2. **Prompts at user-level** (VS Code User prompts folder) — verb rituals (`/wiki-ingest`, `/wiki-lint`, `/new_llm_wiki`). **Self-contained**: no `agent:` frontmatter, no delegation to vault-level artifacts. The prompt body orchestrates user-level skills directly. This is the critical design choice that removes cross-workspace dependencies — if the prompt delegated to a vault-level agent, the whole point of moving to user-level would be defeated because the prompt would fail whenever run outside a vault workspace.
+
+3. **Agents at vault-level** (`.github/agents/`, **optional**) — role personas with `{{PROJECT_NAME}}` interpolated and domain notes appended. Their `tools:` list includes user-level skills plus platform primitives. They compose user-level skills (Variant α) into more disciplined workflows with domain-specific guardrails (spoiler-safe reading, ADR format for development, redact PII for business/personal). Interactive-first via `@mention` in VS Code chat.
+
+**Composition style (α chosen):** vault-level agents orchestrate the same user-level skills that prompts do. The workflow logic lives in the skills. Agents add tool restriction (platform-enforced via `tools:` frontmatter) and domain notes as role personality. This eliminates duplication between prompt and agent bodies — both are thin orchestrators over the same skill layer.
+
+This ADR does *not* immediately restructure the templates. It records the design and a staged rollout plan: pilot on one existing vault, measure the residual concerns, then decide whether to generalize.
+
+If the pilot confirms the benefits without unacceptable degradation, a follow-up ADR-0010 will document the concrete migration steps and mark this ADR's decision as executed. If the pilot reveals blocking issues, ADR-0010 will document the rejection with the observed evidence.
 
 Until the pilot completes, the current architecture (all files at vault level, `--upgrade` mode active) remains the shipping default.
 
@@ -103,133 +107,169 @@ All three platforms:
 
 The pattern the user proposed is therefore not exotic — it is the canonical architecture endorsed by the three main platforms.
 
-## Target architecture (design sketch)
+## Target architecture (Model D)
 
-If the migration completes successfully, the layout would become:
+### Layer 1 — Skills user-level (atomic capabilities)
 
-**User level (`~/.config/llm-wiki/` + VS Code User customization folders), installed once:**
+Installed to `~/.copilot/skills/`, `~/.claude/skills/`, `~/.agents/skills/` by `install.sh` / `install.ps1`. Portable across all Copilot surfaces via the [Agent Skills open standard](https://agentskills.io/).
 
-- `bin/scaffold.py` — unchanged
-- `bin/manifest_reader.py` or equivalent helper — reads the vault manifest
-- Prompts installed to VS Code User prompts folder:
-  - `new_llm_wiki.prompt.md` (as today)
-  - `wiki-ingest.prompt.md` — *generic*, no `{{PROJECT_NAME}}`
-  - `wiki-lint.prompt.md` — *generic*
-- Agents installed to VS Code User agents folder:
-  - `wiki-reader.agent.md`, `wiki-maintainer.agent.md`, `wiki-auditor.agent.md` — all generic
-- Instructions installed to VS Code User instructions folder:
-  - `wiki-conventions.instructions.md` — generic, with `applyTo` restricted via a vault-marker mechanism (see Trade-offs)
+| Skill | Type | Purpose |
+|---|---|---|
+| `wiki-detect-vault` | read | Detect if cwd contains an LLM Wiki vault; auto-invokable via description matching |
+| `wiki-search` | read | Search `wiki/index.md`, return relevant pages |
+| `wiki-read-page` | read | Read a wiki page with frontmatter |
+| `wiki-summarize-source` | read/output | Produce structured summary of a `raw/` source (no writes) |
+| `wiki-write-source-page` | write single-file | Create `wiki/sources/<name>.md` |
+| `wiki-write-analysis` | write single-file | Create `wiki/analysis/<title>.md` |
+| `wiki-update-index` | write single-file | Update `wiki/index.md` |
+| `wiki-append-log` | write single-file | Append to `wiki/log.md` |
+| `wiki-lint-check` | read | Run 7-step audit checks, return report |
 
-**Vault level (per-project), scaffolded:**
+Write skills default to `disable-model-invocation: true` (must be explicitly orchestrated by a prompt, agent, or another skill). Read skills default to autonomous invocation via description matching. Each skill accepts an absolute vault path or defers to `wiki-detect-vault` for resolution.
 
-- `raw/`, `wiki/` — unchanged
-- `.wiki-vault` marker file (empty) — signals "this workspace is a scaffolded LLM Wiki" to the user-level `applyTo` patterns
-- `.github/wiki-vault.yaml` or equivalent — the manifest:
-  ```yaml
-  project_name: "MyProject"
-  internal_type: "development"
-  language: english
-  extra_wiki_folders: [decisions, requirements]
-  extra_page_types: [decision, requirement]
-  domain_conventions: |
-    Decisions follow ADR format...
-  ```
-- `.github/copilot-instructions.md` — minimal signpost (unchanged)
-- `AGENTS.md` — cross-editor bridge (see Trade-offs for the strategy)
+### Layer 2 — Prompts user-level (verbs, self-contained)
 
-The generic agents read the manifest at runtime and behave as if project-specific. Placeholder substitution disappears from scaffold time; parameter resolution moves to runtime context injection.
+Installed to VS Code User prompts folder by `install.sh` / `install.ps1`. **Do not delegate to agents.**
+
+- `/new_llm_wiki` — scaffolder (unchanged from today)
+- `/wiki-ingest <path>` — body orchestrates `wiki-summarize-source` → `wiki-write-source-page` → cross-reference updates → `wiki-update-index` → `wiki-append-log`. In folder mode, chronological ordering + final `wiki-lint-check` invocation.
+- `/wiki-lint` — body orchestrates `wiki-lint-check` and applies unambiguous frontmatter repairs via the platform `edit` tool.
+
+### Layer 3 — Agents vault-level (optional role guardrails)
+
+Remain in `.github/agents/` **only when the domain warrants stricter guardrails**. Their `tools:` include user-level skills + `edit` + `agent` (for subagent invocation). Body composes the same skills as prompts, but adds:
+
+- Role personality with `{{PROJECT_NAME}}` interpolation (unchanged from today)
+- Domain notes appended by scaffolder for `reading_fiction`, `development`, `personal`, `business` (unchanged from today)
+- Tool restriction platform-enforced (e.g. reader's `tools:` excludes `wiki-write-source-page` and other maintainer capabilities)
+- Subagent composition: maintainer invokes auditor at end of batch (unchanged from today)
+
+### Vault filesystem layout (Model D)
+
+```
+<vault>/
+├── raw/                             # unchanged
+├── wiki/                            # unchanged
+├── .github/
+│   ├── copilot-instructions.md      # signpost (unchanged), documents install.sh dependency
+│   ├── instructions/
+│   │   └── wiki-conventions.instructions.md   # unchanged, vault-level, applyTo unchanged
+│   └── agents/                      # optional, only if --with-agents or sensitive domain
+│       └── wiki-{reader,maintainer,auditor}.agent.md
+├── AGENTS.md                        # unchanged, cross-editor bridge
+└── .gitignore                       # unchanged
+```
+
+No `.github/prompts/` — prompts come from user-level install. `--upgrade` mode continues to handle updates to vault-level agents and conventions.
+
+## Emergent properties
+
+1. **Cross-surface uniformity.** VS Code chat and Copilot CLI have identical baseline capability via the user-level layers. VS Code chat additionally gets the role experience when agents are present in the current workspace folder.
+
+2. **Composability with external skills.** OpenSpec (or any third-party skill) invokes `wiki-search`, `wiki-read-page`, `wiki-write-analysis` via description matching or explicit reference. Zero knowledge of the wiki's agent layer required.
+
+3. **Zero prompt→agent cross-workspace dependency.** Removing `agent:` frontmatter from prompts eliminates the fragility of "prompt in openspec/ folder tries to call agent in llm-wiki/ folder". Prompts stand on their own.
+
+4. **Agents become an opt-in strictness layer.** A minimal vault (`--minimal` scaffold, or `hobby` / `learning` domains by default) omits agents entirely: operations run through user-level prompt+skill with standard guardrails. Sensitive domains (`business`, `personal`) include agents by default for the extra tool restriction and domain notes.
+
+5. **Graceful degradation for vault clone.** A vault cloned by someone without user-level skills installed still opens: `.github/copilot-instructions.md` documents the one-time install. If agents are present, they reference skills that fail cleanly rather than corrupting state.
 
 ## Trade-offs to validate in the pilot
 
-These are the concerns that could block the migration. The pilot must generate concrete evidence on each.
+Model D shrinks the pilot's scope compared to the earlier Model C proposal. Most of the original concerns either become non-issues or invert in Model D's favor. Two residual concerns remain non-trivial:
 
-### 1. Portability of a cloned vault
+### 1. Skill dependency of vault-level agents (α composition)
 
-**Current behavior:** a cloned vault is self-contained. Any developer opening it in Copilot gets the operational agents immediately, because they live in `.github/`.
+Agents orchestrate user-level skills rather than containing workflow inline. **A vault cloned onto a machine without skills installed will see agents whose workflow references non-existent skills.**
 
-**After migration:** a cloned vault without the user-level install shows the vault structure but no operational commands. Impact depends on:
-- How often vaults are cloned/shared vs single-user.
-- Whether we ship an `./install-vault-agents.sh` fallback that copies user-level templates into `.github/` on demand.
+**Mitigation:** `.github/copilot-instructions.md` signpost documents the one-time install (`bin/install.sh` or `bin/install.ps1`). The installer becomes the canonical bootstrapping step for full functionality.
 
-**Pilot must measure:** the friction of onboarding a second machine or a collaborator.
+**Pilot must measure:** whether "vault-clone without install" is a real user path in practice, or a theoretical concern. If real, add an `install-vault-local.sh` fallback that copies user-level skills into a vault-local location as a documented degraded mode.
 
-### 2. Cross-editor `AGENTS.md` bridge
+### 2. Skills lack platform-enforced tool restriction
 
-**Current behavior:** `AGENTS.md` at vault root contains full role instructions readable by Codex/OpenCode/Aider/Cursor without any install.
+User-level skills do not have a `tools:` frontmatter equivalent to custom agents. A skill that is *supposed to* be read-only relies on textual instructions in `SKILL.md` rather than platform rejection. If the model misinterprets, damage is possible.
 
-**After migration:** three options, none ideal:
-- (a) `AGENTS.md` continues to duplicate the full instructions (defeats DRY).
-- (b) `AGENTS.md` uses Claude-style `@~/.config/llm-wiki/agents/...` imports (only Claude honors this today).
-- (c) `AGENTS.md` shrinks to a signpost pointing at the user-level path and assumes install.
+**Mitigation:** design write skills as *single-file, targeted* (`wiki-write-source-page` writes exactly one path; `wiki-append-log` only appends to one file). The blast radius of a misbehaving skill is capped at one file. Additionally, agents (where present) provide platform-enforced restriction by omitting write skills from the reader's `tools:` list.
 
-**Pilot must decide:** which of (a)/(b)/(c) — or a hybrid (Cursor via nested AGENTS.md, Copilot via user-level, Claude via `@import`) — is acceptable for the user's actual cross-editor usage. If Copilot is the only real target, the question is moot.
+**Pilot must measure:** whether any skill in practice performs unexpected writes; whether reliance on textual constraint is acceptable given the blast radius.
 
-### 3. `applyTo` scope leakage
+### 3. Cross-editor `AGENTS.md` bridge
 
-**Current behavior:** `wiki-conventions.instructions.md` uses `applyTo: "wiki/**,raw/**"` — active only inside a scaffolded vault (those paths exist only there).
+**Under Model D:** agents stay vault-level (when present), so `AGENTS.md` continues to duplicate their content for Codex/Aider/Cursor as today. Cross-editor tools do not benefit from user-level Copilot skills (they don't consume the standard), but they can consume vault-level agents.
 
-**After migration:** a user-level `applyTo: "wiki/**,raw/**"` fires on *any* workspace with `wiki/` or `raw/` directories, whether or not it's a scaffolded vault. This is unwanted.
+**Not a real change** vs today. This item is closed unless the pilot reveals that non-Copilot users want composability with wiki operations from their host's own tooling.
 
-**Mitigation:** introduce a marker file (e.g. `.wiki-vault` in vault root) and change `applyTo` to a pattern that references it — or use `applyTo: "**/.wiki-vault/../**"` if the glob engine supports parent references, or a two-file approach with a workspace-scope shim that re-anchors the user-level rules.
+### 4. `applyTo` scope of `wiki-conventions.instructions.md`
 
-**Pilot must test:** whether the marker+glob mechanism actually restricts scope in practice on VS Code Copilot.
+**Under Model D:** instructions stay vault-level with `applyTo: "wiki/**,raw/**"` unchanged. **Not a change** vs today. Model C's marker-file requirement is avoided entirely. This item is closed.
 
-### 4. Discoverability for contributors
+### 5. Discoverability for contributors
 
-**Current behavior:** opening a vault in VS Code shows all operational files under `.github/`. A contributor can grep the workflow, understand what `/wiki-ingest` does, without knowing anything external.
-
-**After migration:** the vault contains only the manifest. A contributor reading the vault sees nothing about the operational workflow — they have to know to look at `~/.config/llm-wiki/`.
-
-**Mitigation:** the vault's `README.md` (or a `.github/README.md`) links explicitly to the user-level install and documents where the agents live.
-
-### 5. Migration cost
-
-- Refactor all placeholder-holding templates into placeholder-free generic files.
-- Design and implement the manifest format + reader helper.
-- Extend `install.sh` to install prompts, agents, and instructions to the user-level VS Code folders (not just prompts as today).
-- Design and implement `scaffold.py --migrate-existing-vault <path>` that reads an existing vault's `.github/` files, extracts the parameters into a manifest, and removes the operational files.
-- Update `AGENTS.md` bridge according to the outcome of trade-off #2.
-- Rewrite ADR-0002 as `Superseded` or add a companion ADR explaining the widened scope (user-level is now for more than just the scaffold command).
-- Update [ARCHITECTURE.md](../../ARCHITECTURE.md) diagram and text.
-- Update [README.md](../../README.md).
+**Under Model D:** contributors reading the vault see optional agents (when present) + signpost documenting where skills come from. Better than Model C's "vault sees only the manifest" outcome. This item is closed.
 
 ## Consequences (if adopted after pilot)
 
 **Positive**
-- **Single upgrade point.** Improve a template → every vault benefits immediately. `--upgrade` mode disappears from the scaffolder.
-- **Zero template drift.** All vaults run the same operational code by construction.
-- **Vault leaner.** Only `raw/`, `wiki/`, manifest, signpost — ~5 files vs current ~10.
-- **Alignment with industry-canonical pattern** (Claude Code, Copilot, Cursor).
-- **New feature-development is faster.** Adding a workflow step to `@wiki-maintainer` no longer requires re-scaffolding vaults.
+- **Composability with third-party skills** (OpenSpec, others) via the skill layer. Solves the concrete pain point that triggered this ADR.
+- **Cross-surface uniformity.** `/wiki-ingest` works identically in VS Code chat and Copilot CLI from any folder. Skills work identically across Copilot in VS Code, Copilot CLI, and cloud agent.
+- **Agents become an opt-in strictness layer.** Vault authors choose whether to add them based on domain sensitivity, rather than being forced into the current one-size-fits-all model.
+- **Prompt→agent cross-workspace fragility eliminated.** Prompts self-contained.
+- **Vault template still meaningful.** Agents remain vault-level when present; cross-editor bridge (`AGENTS.md`) largely unchanged. Retrocompatibility with today's ecosystem is high.
+- **Migration is incremental.** Skills and user-level prompts are additive; vault-level prompts can be deprecated with a soft transition rather than a breaking change.
 
 **Negative**
-- **Vault is no longer self-contained.** Cloning requires an install step, or an explicit fallback script.
-- **Cross-editor bridge complexity increases** — `AGENTS.md` strategy needs a definitive answer.
-- **`applyTo` scoping requires a marker-file mechanism** — one more moving part.
-- **Discoverability regresses** for contributors reading only the vault.
-- **Migration cost is real** — see checklist above.
+- **User-level install required for full functionality.** Cloning a vault alone is no longer sufficient; `install.sh` / `install.ps1` becomes a bootstrap step. Today the install is required for scaffolding — with Model D it becomes a prerequisite for vault operations as well.
+- **Skills lack platform-enforced tool restriction.** Mitigated by single-file blast radius and by agent layer where present, but the theoretical risk exists.
+- **Some duplication of orchestration logic between prompt and agent bodies.** Both invoke the same skills; agents add role personality and tool restriction. The workflow logic itself is in the skills, so the duplicated part is thin.
 
 **Neutral**
-- Users who prefer the current model can be supported by an install-time flag (`--vault-local-templates`) that reverts to embedding everything in `.github/` per vault.
+- `--upgrade` mode remains relevant for vault-level agent updates (which continue to receive domain notes evolution over time), just less critical since the bulk of updates now happen via user-level `install.sh` re-run.
 
 ## Alternatives considered
 
-- **Status quo (all files at vault level, `--upgrade` handles drift)** — currently shipping. Simple mental model, zero external dependencies for a cloned vault. Loses on DRY and on upgrade friction as vault count grows.
-- **Hybrid without pilot: ship both simultaneously** — installer copies generics to user-level *and* to `.github/`, with vault-level shadowing user-level via precedence. Rejected as bloat: doubles the surface area with no clear benefit.
-- **Full immediate migration without pilot** — rejected as risky. The five trade-offs above are all real; committing before measuring at least one of them in production would likely produce an ADR-0010 reversing course.
-- **Adopt only for prompts, not agents/instructions** — considered. Loses the biggest wins (DRY on agents is where duplication is largest). Would only remove ~2 files per vault. Not worth the split.
-- **Move to Claude Code as primary host and adopt `@import` syntax natively** — out of scope for this ADR. Would resolve trade-off #2 by fiat, but re-hosts the entire project.
+- **Status quo** (all files at vault level, `--upgrade` handles drift) — currently shipping. Simple mental model, zero external dependencies for a cloned vault. Loses on DRY and, decisively, on cross-tool composability with skill-based third parties.
+
+- **Model C: three-layer user-level split with vault manifest** — the earlier iteration of this ADR proposed installing skill+prompt+agent all user-level, with a vault-level `.wiki-vault.yaml` manifest holding project-specific parameters. **Rejected in favor of Model D** because: (a) required refactoring every agent template to be placeholder-free and to read from a new manifest format; (b) required a marker-file mechanism (`.wiki-vault` + special glob) to scope `applyTo` correctly; (c) required prompts to delegate to user-level agents via `agent:` frontmatter, and if any prompt were run in a context where the user-level agent were not available, the whole workflow would fail — reintroducing the cross-workspace dependency the ADR set out to remove; (d) discoverability regressed sharply (vault becomes just a manifest). Model D achieves the same composability wins with substantially less refactor and no manifest.
+
+- **Model A: skill-only migration** — all operations become skills, agents disappear entirely. Rejected: loses platform-enforced tool restriction (critical for the maintainer's write-heavy workflow), loses role/persona semantics established in [ADR-0004](0004-three-fixed-roles.md).
+
+- **Model B: hybrid without pilot** — ship both vault-level and user-level in parallel with precedence-based shadowing. Rejected: doubles surface area with no clear benefit, complicates the mental model.
+
+- **Adopt only skills at user-level, keep prompts and agents vault-level** — skills would compose with OpenSpec but `/wiki-ingest` would still require per-vault install, negating half the win of moving to user-level. Rejected.
+
+- **Variant β of Model D: thick agent with workflow inline** — vault-level agents contain the full 8-step INGEST workflow inline (as today), user-level skills exist as a separate capability API only for external composition. Pro: vault clone self-contained without skills. Con: duplication of workflow logic between agents (inline) and prompts (which would still need to orchestrate skills). **Rejected in favor of Variant α** for DRY — workflow logic lives in one place (the skills), both prompt and agent are thin orchestrators.
+
+- **Move to Claude Code as primary host and adopt `@import` syntax natively** — out of scope; would re-host the entire project.
 
 ## Follow-up (planned)
 
-- **Pilot definition** — pick one existing vault, define acceptance criteria for each of the 5 trade-offs, timebox the pilot (e.g. 2–3 weeks of active use).
-- **ADR-0010** — post-pilot decision. Either "migration approved" (with concrete plan) or "migration rejected" (with observed evidence).
-- If accepted: **ADR-0011+** as needed for the specific sub-decisions (manifest format, marker-file mechanism, `AGENTS.md` bridge strategy).
+- **Pilot scope** — one existing vault (candidate: an active `development` or `research` domain vault). Timebox: 2–3 weeks of active use. Acceptance criteria:
+  1. **Composability**: OpenSpec skill invokes `wiki-search` and `wiki-write-analysis` from Copilot CLI in a sibling folder, with correct results and no user friction.
+  2. **Cross-surface**: `/wiki-ingest raw/foo.md` produces identical vault state whether invoked from VS Code chat (vault folder active) or Copilot CLI (any folder, absolute path).
+  3. **Graceful degradation**: cloning the vault on a machine without skills installed produces a working "read-only" state (`.github/copilot-instructions.md` signpost visible); running `install.sh` afterward reaches full parity.
+  4. **Blast radius**: no skill performs a write outside its documented target path across the pilot period.
+
+- **Implementation checklist** (executed only if pilot criteria are met):
+  - Author 9 skill files (see Layer 1 table) under `templates/skills/`.
+  - Author 2 user-level prompts (`wiki-ingest.prompt.md`, `wiki-lint.prompt.md`) that orchestrate skills; no `agent:` frontmatter.
+  - Extend `install.sh` and `install.ps1` to install skills and user-level prompts alongside `/new_llm_wiki`.
+  - Update `scaffold.py` to omit `.github/prompts/` from new vaults; add `--with-agents` / `--minimal` scaffold flags; keep `--upgrade` for agent updates.
+  - Retrocompatibility path: existing vaults with `.github/prompts/` keep working (workspace-level shadows user-level with same effect).
+  - Update [ARCHITECTURE.md](../../ARCHITECTURE.md) and [README.md](../../README.md).
+
+- **ADR-0010** — post-pilot decision: approved with concrete plan (mark this ADR as Executed) or rejected with observed evidence (this ADR stays Proposed indefinitely or is closed as Rejected).
+
+- **ADR-0011+** — as needed for sub-decisions (e.g. per-domain default for `--with-agents` vs `--minimal`, specific SKILL.md signatures, `install-vault-local.sh` fallback design).
 
 ## References
 
 - [VS Code Copilot customization overview](https://code.visualstudio.com/docs/copilot/copilot-customization)
+- [Use Agent Skills in VS Code](https://code.visualstudio.com/docs/agent-customization/agent-skills)
+- [Custom agents in VS Code](https://code.visualstudio.com/docs/agent-customization/custom-agents)
+- [Use prompt files in VS Code](https://code.visualstudio.com/docs/agent-customization/prompt-files)
+- [Agent Skills open standard](https://agentskills.io/)
 - [GitHub Copilot: Adding repository custom instructions](https://docs.github.com/en/copilot/customizing-copilot/adding-repository-custom-instructions-for-github-copilot)
 - [Claude Code: How Claude remembers your project](https://code.claude.com/docs/en/memory)
 - [Cursor: Rules](https://cursor.com/docs/context/rules)
-- Related ADRs: [ADR-0002](0002-user-level-prompt-not-skill.md) (only the scaffold command is user-level today — this ADR proposes widening that scope), [ADR-0007](0007-ingest-lint-remain-prompts.md) (prompts vs skills — orthogonal, both preserved)
+- Related ADRs: [ADR-0002](0002-user-level-prompt-not-skill.md) (only the scaffold command is user-level today — this ADR widens that scope to skills and other prompts), [ADR-0007](0007-ingest-lint-remain-prompts.md) (prompts vs skills for ingest/lint — prompts remain, now composing user-level skills), [ADR-0004](0004-three-fixed-roles.md) (three fixed roles — preserved as optional agent layer in Model D)
