@@ -3,6 +3,22 @@
 ## Status
 Proposed (2026-07)
 
+## Erratum (2026-07, post-pilot correction)
+
+The original text of this ADR (below) repeatedly claimed that agents provide **"platform-enforced tool restriction"** by listing user-level skills in their `tools:` frontmatter (e.g. reader's `tools:` excluding `wiki-write-source-page`). This claim is **incorrect**.
+
+VS Code Copilot's `tools:` frontmatter is an allowlist of **real tool IDs** (platform tools like `read_file`, `grep_search`, `replace_string_in_file`, `run_in_terminal`; VS Code toolset group names; MCP/extension tool IDs). It does NOT accept skill names. Skills are a different mechanism — `SKILL.md` files auto-loaded as instructions when their `description` matches the current task semantically; they are playbooks, not endpoints.
+
+Consequence: our Phase C agent templates (and the initially deployed vault agents) listed skill names in `tools:`, which VS Code silently dropped, effectively leaving the agents **unrestricted** — the opposite of the intent.
+
+**Correction applied post-Phase C (Phase C++):**
+
+- Agent templates now list real tool IDs: reader `[read_file, grep_search, file_search, list_dir, semantic_search, run_in_terminal]`; maintainer adds `[replace_string_in_file, multi_replace_string_in_file, create_file]`; auditor adds `[replace_string_in_file, multi_replace_string_in_file]` (deliberately no `create_file`).
+- Skills are referenced in agent bodies via "apply the `X` skill" wording — not "invoke `X`" — to reflect the playbook semantics.
+- Subagent invocation uses the separate `agents:` frontmatter field (already correct), e.g. `agents: [wiki-auditor]` on the maintainer.
+
+The **conclusion of ADR-0009 stands**: Model D + Variant α remains the chosen architecture. Only the enforcement claim about `tools:` needed correction. Real tool-ID allowlisting still gives us the read-only vs write distinction that Model D depends on.
+
 ## Context
 
 Today, when `/new-llm-wiki` scaffolds a new vault, it materializes the full set of operational customization files inside the vault's `.github/` directory:
