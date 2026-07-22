@@ -207,6 +207,11 @@ Optional:
                                    Also removes any pre-Model-D vault-level prompts
                                    (.github/prompts/wiki-*.prompt.md with `agent:` frontmatter),
                                    which are now redundant with user-level installs.
+                                   Refuses to run if --type differs from the vault's original
+                                   scaffolded type (see --force-retype).
+  --force-retype                   Bypass the --upgrade type-mismatch guard.
+                                   Destructive: adds different raw/ and wiki/ folders per the
+                                   new --type. Use only when intentionally re-typing a vault.
   --seed <path>                    Copy a starter source into raw/<domain-default>/
   --dry-run                        Print plan, touch nothing on disk
   --detect-only                    Report vault state as JSON, exit
@@ -327,6 +332,38 @@ def detect_domain_hint(vault: Path) -> Optional[str]:
         return "business"
     if "courses" in subfolders or "exercises" in subfolders:
         return "learning"
+    return None
+
+
+def detect_scaffolded_type(vault: Path) -> Optional[str]:
+    """Read the vault's original --type by parsing the `**Type:** <display>` line
+    in overview.md or copilot-instructions.md.
+
+    Returns the internal type identifier (matching a DOMAIN_CONFIGS key),
+    or None if it cannot be determined (e.g. very old vault or hand-edited signpost).
+
+    Used by --upgrade to refuse type mismatches unless --force-retype is passed.
+    This prevents the accidental addition of wrong-domain folders (e.g. running
+    --upgrade --type development on a vault originally scaffolded as learning).
+    """
+    for candidate in (
+        vault / "wiki" / "overview.md",
+        vault / ".github" / "copilot-instructions.md",
+    ):
+        if not candidate.is_file():
+            continue
+        try:
+            content = candidate.read_text(encoding="utf-8", errors="ignore")
+        except OSError:
+            continue
+        for line in content.split("\n"):
+            if line.startswith("**Type:**"):
+                after = line[len("**Type:**"):].strip()
+                # Format may be "learning" or "learning · **Description:** ..."
+                display = after.split("·")[0].strip()
+                for internal, cfg in DOMAIN_CONFIGS.items():
+                    if cfg["display_type"] == display:
+                        return internal
     return None
 
 
@@ -714,6 +751,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--with-agents", dest="with_agents", action="store_true")
     p.add_argument("--force", dest="force", action="store_true")
     p.add_argument("--upgrade", dest="upgrade", action="store_true")
+    p.add_argument("--force-retype", dest="force_retype", action="store_true")
     p.add_argument("--seed", dest="seed")
     p.add_argument("--dry-run", dest="dry_run", action="store_true")
     p.add_argument("--detect-only", dest="detect_only", action="store_true")
@@ -814,6 +852,22 @@ def main(argv: Optional[List[str]] = None) -> int:
     # Resolve internal type and load config.
     internal_type = resolve_type(args.type, args.fiction, args.nonfiction)
     config = DOMAIN_CONFIGS[internal_type]
+
+    # Type-mismatch guard on --upgrade: prevent adding wrong-domain folders
+    # when the user passes an incorrect --type by accident.
+    if mode == "upgrade" and not args.force_retype:
+        detected = detect_scaffolded_type(vault)
+        if detected is not None and detected != internal_type:
+            die(
+                f"Type mismatch on --upgrade: vault was originally scaffolded as "
+                f"'{DOMAIN_CONFIGS[detected]['display_type']}' (internal: {detected}) "
+                f"but --type resolves to '{config['display_type']}' "
+                f"(internal: {internal_type}). "
+                "Re-run with the correct --type, or add --force-retype to intentionally "
+                "change the vault's type (destructive: will add different raw/ and wiki/ folders).",
+                code=2,
+                json_out=args.json_out,
+            )
 
     # Resolve whether to include vault-level agents.
     if args.minimal:

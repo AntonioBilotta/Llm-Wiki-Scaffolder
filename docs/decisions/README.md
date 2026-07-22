@@ -43,3 +43,4 @@ Options rejected, with reasons.
 | [0007](0007-ingest-lint-remain-prompts.md) | `/wiki-ingest` and `/wiki-lint` stay prompts, not skills | Accepted |
 | [0008](0008-windows-support.md) | Windows support | Accepted |
 | [0009](0009-evaluate-user-level-vault-operational-customizations.md) | Evaluate migrating vault operational customizations to user-level | Proposed |
+| [0011](0011-skill-token-optimization-strategies.md) | Skill token optimization strategies (deferred) | Proposed |
