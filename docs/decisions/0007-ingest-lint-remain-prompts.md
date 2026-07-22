@@ -42,3 +42,18 @@ The `references/` modularity pattern (moving long-form assets to on-demand files
 - **Convert `/wiki-lint` only** (since it has no required argument) — rejected. Side-effects still require consent; the value of autonomy is weaker than the value of explicit-invocation discipline.
 - **Adopt `references/` modularity now, without format switch** — accepted in principle, applied on-demand rather than eagerly. Candidates flagged in [README.md](../../README.md) "Future ideas": domain notes table, per-domain conventions, per-domain checklists.
 - **Ancillary "lint nudge" skill alongside `/wiki-lint`** — deferred. Add if users report forgetting to lint. No signal yet.
+
+## Erratum (2026-07)
+
+Several factual claims in this ADR are inaccurate per current VS Code documentation ([Use Agent Skills in VS Code](https://code.visualstudio.com/docs/agent-customization/agent-skills)):
+
+- The Consequences section lists *"`argument-hint: '<path under raw/>'` remains for `/wiki-ingest`"* as a positive of prompt files, implying skills do not support this. **Skills also support `argument-hint`** as a frontmatter field. This is not a differentiator.
+- The "Alternatives considered" entry *"Convert both to skills — rejected. Loses `argument-hint`"* is likewise wrong on that specific point.
+- The concerns about autonomous invocation on writing operations are **mitigable** by setting `disable-model-invocation: true` in the skill frontmatter, which forces manual `/`-invocation only.
+- The Context section frames prompts as "workspace-level" as-is. Since [ADR-0009](0009-evaluate-user-level-vault-operational-customizations.md) proposes moving them to user-level, this framing is transitional. User-level skill installation is also supported (`~/.copilot/skills/`) and was not acknowledged.
+
+**The decision to keep `/wiki-ingest` and `/wiki-lint` as prompt files still stands**, on the following narrower grounds that are unaffected by the corrections:
+
+- Prompt files delegate to a role agent via `agent:` frontmatter — a first-class, deterministic mechanism. Skills express delegation in prose within `SKILL.md`, which is functionally equivalent but less rigid. This is the primary remaining reason.
+- The verb/subject model documented in [ADR-0005](0005-prompt-vs-agent-invocation.md) maps naturally onto prompt-per-verb + agent-per-role. Keeping prompts preserves that mapping.
+- The `references/` modularity benefit of skills remains real and is available independently of a format switch, as already noted in the Decision section.

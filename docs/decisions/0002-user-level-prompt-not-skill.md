@@ -38,4 +38,17 @@ Claude Code supports user-level skills at `~/.claude/skills/`, but Claude Code i
 - **Copilot workspace-level skill (`.github/skills/`)** — rejected because the target directory does not yet exist at scaffold time. Would require the user to set up a scratch workspace first, defeating the "install once, use anywhere" model.
 - **Copilot workspace-level prompt (`.github/prompts/`)** — same rejection reason.
 - **Claude Code user-level skill (`~/.claude/skills/`)** — deferred, not rejected. Adding a Claude skill alongside the Copilot prompt would give autonomous invocation on that host with a ~150-line wrapper that delegates to the same `scaffold.py`. Worth revisiting if Claude Code becomes a routine alternative surface. Noted in [README.md](../../README.md) "Future ideas".
+
+## Erratum (2026-07)
+
+The Context section of this ADR states that Copilot skills are *"workspace-scoped only"* with *"no user-level equivalent"* and treats this as the primary reason to reject the skill format. Per current VS Code documentation ([Use Agent Skills in VS Code](https://code.visualstudio.com/docs/agent-customization/agent-skills)), this is inaccurate: personal skills at user profile level are supported at `~/.copilot/skills/`, `~/.claude/skills/`, and `~/.agents/skills/`. Whether this was always the case or the platform added support after this ADR was written is unclear from the docs; either way, the stated fact is wrong.
+
+Related inaccuracies in the same section: skills support `argument-hint`, `user-invocable`, and `disable-model-invocation` frontmatter fields, meaning a skill can be configured to behave equivalently to a manually-invoked slash-command with typed arguments — removing the "autonomous invocation risk" as a hard blocker.
+
+**The decision to use a prompt file for `/new_llm_wiki_vault` still stands**, on the following unchanged grounds:
+
+- The prompt file is the simplest artifact for the job. No bundled scripts, no `references/`, no autonomous-invocation control needed — a skill would be a heavier abstraction for equivalent behavior.
+- No delegation to a role agent is involved (there is no vault-side agent yet at scaffold time), so the `agent:` frontmatter advantage relevant to [ADR-0007](0007-ingest-lint-remain-prompts.md) does not apply here — but neither does any skill-specific advantage.
+
+The "Alternatives considered" list should be read with this correction: user-level Copilot skills are a technically viable alternative that was not evaluated at the time. They remain unadopted on the grounds above rather than on impossibility.
 - **VS Code extension** — rejected; huge development cost, and prompts already do the job. Noted in [README.md](../../README.md).
