@@ -1,7 +1,7 @@
 # ADR-0009: Evaluate migrating vault operational customizations to user-level
 
 ## Status
-Proposed (2026-07)
+Executed (2026-07) — Phase A/B/C/C+/C++/C+++ shipped, validated end-to-end via `/wiki-ingest` on the dev-second-brain pilot vault.
 
 ## Erratum (2026-07, post-pilot correction)
 
