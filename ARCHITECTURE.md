@@ -18,7 +18,7 @@ flowchart TB
         direction TB
         R_INSTALL["bin/install.sh<br/>(Bash, idempotent)"]
         R_SCAFFOLD["bin/scaffold.py<br/>(Python 3.8+, stdlib only)"]
-        R_PROMPT["prompts/new_llm_wiki_vault.prompt.md<br/>(LLM orchestrator)"]
+        R_PROMPT["prompts/new-llm-wiki.prompt.md<br/>(LLM orchestrator)"]
         R_TEMPLATES["templates/<br/>├─ agents/ (reader, maintainer, auditor)<br/>├─ prompts/ (ingest, lint)<br/>├─ instructions/ (conventions)<br/>├─ overview/ (per domain)<br/>├─ AGENTS.md, copilot-instructions.md<br/>└─ karpathy_llm_wiki_pattern.md"]
     end
 
@@ -34,10 +34,10 @@ flowchart TB
         direction TB
         H_TEMPLATES["~/.config/llm-wiki/templates/"]
         H_SCRIPT["~/.config/llm-wiki/bin/scaffold.py"]
-        H_PROMPT["VS Code prompts/<br/>new_llm_wiki_vault.prompt.md"]
+        H_PROMPT["VS Code prompts/<br/>new-llm-wiki.prompt.md"]
     end
 
-    subgraph INVOKE["/new_llm_wiki_vault — HYBRID ORCHESTRATION"]
+    subgraph INVOKE["/new-llm-wiki — HYBRID ORCHESTRATION"]
         direction TB
         O_PARSE["LLM: parse inline args<br/>(non-deterministic but constrained)"]
         O_WIZARD["LLM: vscode_askQuestions<br/>only for missing params"]
@@ -75,7 +75,7 @@ flowchart TB
 
     REPO -->|"git clone + install.sh"| INSTALL
     INSTALL --> USER_HOME
-    H_PROMPT -.->|"invoked via /new_llm_wiki_vault"| INVOKE
+    H_PROMPT -.->|"invoked via /new-llm-wiki"| INVOKE
     H_SCRIPT -.->|"called by orchestrator"| O_DETECT
     H_SCRIPT -.->|"called by orchestrator"| O_INVOKE
     H_TEMPLATES -.->|"read by scaffold.py"| O_INVOKE
@@ -116,7 +116,7 @@ flowchart TB
 - `rsync --delete` guarantees that *updating* is identical to *installing from scratch*: no accumulated runtime state in `~/.config/llm-wiki/`. Contract stated in [README.md](README.md): *"edit the repo, not the runtime copy."*
 
 **Why user-level (installed once):**
-- The `/new_llm_wiki_vault` slash-command must exist *before* a workspace-vault exists (it is what *creates* vaults). So it goes into `VS Code User/prompts/`, not `.github/prompts/`.
+- The `/new-llm-wiki` slash-command must exist *before* a workspace-vault exists (it is what *creates* vaults). So it goes into `VS Code User/prompts/`, not `.github/prompts/`.
 - Trade-off with Copilot skills (workspace-scoped only) documented in [ADR-0002](docs/decisions/0002-user-level-prompt-not-skill.md).
 
 ### 2. Scaffold layer — [bin/scaffold.py](bin/scaffold.py)
@@ -139,7 +139,7 @@ flowchart TB
 
 Rationale detailed in [ADR-0001](docs/decisions/0001-python-stdlib-only.md) and [ADR-0003](docs/decisions/0003-deterministic-scaffold-llm-fill.md).
 
-### 3. Orchestration layer — [prompts/new_llm_wiki_vault.prompt.md](prompts/new_llm_wiki_vault.prompt.md)
+### 3. Orchestration layer — [prompts/new-llm-wiki.prompt.md](prompts/new-llm-wiki.prompt.md)
 
 **What it does (LLM-driven, tightly bounded):**
 - Parses inline flags from the user's message.

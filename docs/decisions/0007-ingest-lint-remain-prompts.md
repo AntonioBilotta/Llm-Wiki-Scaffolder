@@ -10,7 +10,7 @@ VS Code Copilot supports two formats for custom LLM capabilities:
 1. **Prompt files** (`.prompt.md`) — explicit invocation via `/name`, structured `argument-hint`, delegation via `agent:` frontmatter.
 2. **Skills** (`SKILL.md` + `references/` bundling) — autonomous invocation from `description` matching, progressive disclosure of on-demand asset files.
 
-`/wiki-ingest` and `/wiki-lint` currently live as workspace-level `.prompt.md` files inside each scaffolded vault. Since they are already workspace-scoped, the distribution argument that ruled out skills for `/new_llm_wiki_vault` ([ADR-0002](0002-user-level-prompt-not-skill.md)) does **not** apply here — a conversion to skill format would be cost-neutral on the install side.
+`/wiki-ingest` and `/wiki-lint` currently live as workspace-level `.prompt.md` files inside each scaffolded vault. Since they are already workspace-scoped, the distribution argument that ruled out skills for `/new-llm-wiki` ([ADR-0002](0002-user-level-prompt-not-skill.md)) does **not** apply here — a conversion to skill format would be cost-neutral on the install side.
 
 So the real question is: does autonomous invocation + `references/` modularity buy enough to justify swapping the format?
 

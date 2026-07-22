@@ -55,7 +55,7 @@ if (-not (Test-Path $ScaffoldPy)) {
     exit 1
 }
 
-$PromptSource = Join-Path $RepoRoot "prompts\new_llm_wiki_vault.prompt.md"
+$PromptSource = Join-Path $RepoRoot "prompts\new-llm-wiki.prompt.md"
 if (-not (Test-Path $PromptSource)) {
     Write-Error "Missing prompt file at $PromptSource"
     exit 1
@@ -111,7 +111,11 @@ $InstallRoot = Join-Path $env:APPDATA "llm-wiki"
 $InstallBin = Join-Path $InstallRoot "bin"
 $InstallTemplates = Join-Path $InstallRoot "templates"
 $InstallScaffold = Join-Path $InstallBin "scaffold.py"
-$InstallPrompt = Join-Path $VSCodePromptsDir "new_llm_wiki_vault.prompt.md"
+$InstallPrompt = Join-Path $VSCodePromptsDir "new-llm-wiki.prompt.md"
+# Legacy: prior versions installed the scaffold prompt as new_llm_wiki_vault.prompt.md.
+# Kept here so install and uninstall clean up the old filename on machines that had
+# a previous install (per ADR-0002 Erratum: naming update).
+$LegacyInstallPrompt = Join-Path $VSCodePromptsDir "new_llm_wiki_vault.prompt.md"
 
 # ---------------------------------------------------------------------------
 # Uninstall
@@ -121,7 +125,7 @@ if ($Uninstall) {
     Write-Host "Uninstalling llm-wiki-scaffolder..."
     $removed = 0
 
-    foreach ($target in @($InstallScaffold, $InstallPrompt)) {
+    foreach ($target in @($InstallScaffold, $InstallPrompt, $LegacyInstallPrompt)) {
         if (Test-Path $target) {
             Remove-Item -Force $target
             Write-Host "  removed: $target"
@@ -196,6 +200,11 @@ Copy-Item -Force $ScaffoldPy $InstallScaffold
 # ($PromptSource existence was validated at prerequisites time.)
 if (-not $NoPrompt) {
     New-Item -ItemType Directory -Force -Path $VSCodePromptsDir | Out-Null
+    # Remove legacy prompt file if present (renamed 2026-07 per ADR-0002 Erratum).
+    if (Test-Path $LegacyInstallPrompt) {
+        Remove-Item -Force $LegacyInstallPrompt
+        Write-Host "  removed legacy prompt: $LegacyInstallPrompt"
+    }
     Copy-Item -Force $PromptSource $InstallPrompt
 }
 
@@ -226,7 +235,7 @@ Write-Host "Installation complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. Reload VS Code window (Ctrl+Shift+P -> Developer: Reload Window)"
-Write-Host "  2. In Copilot Chat, type: /new_llm_wiki_vault"
+Write-Host "  2. In Copilot Chat, type: /new-llm-wiki"
 Write-Host ""
 Write-Host "Installed paths:"
 Write-Host "  $InstallRoot\"

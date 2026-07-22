@@ -35,7 +35,7 @@ Options rejected, with reasons.
 | # | Title | Status |
 |---|---|---|
 | [0001](0001-python-stdlib-only.md) | Python stdlib only for `scaffold.py` | Accepted |
-| [0002](0002-user-level-prompt-not-skill.md) | User-level prompt, not skill, for `/new_llm_wiki_vault` | Accepted |
+| [0002](0002-user-level-prompt-not-skill.md) | User-level prompt, not skill, for `/new-llm-wiki` | Accepted |
 | [0003](0003-deterministic-scaffold-llm-fill.md) | Deterministic scaffold + LLM semantic fill split | Accepted |
 | [0004](0004-three-fixed-roles.md) | Three fixed roles: reader, maintainer, auditor | Accepted |
 | [0005](0005-prompt-vs-agent-invocation.md) | Prompt vs agent — invocation model | Accepted |

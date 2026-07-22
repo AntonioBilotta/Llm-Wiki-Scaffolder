@@ -10,7 +10,7 @@ Scaffolding an LLM Wiki vault involves a mix of two very different kinds of work
 1. **Structural**: create a fixed directory tree, copy templates, substitute placeholders, enforce invariants (never write into `raw/`, keep `wiki/` content folders empty, keep the signpost minimal).
 2. **Semantic**: write 4–5 project-specific "suggested first questions" in `wiki/overview.md`; optionally add short domain-specific notes to one of the three agent files.
 
-Both must happen in one invocation of `/new_llm_wiki_vault`. Two extreme designs are possible:
+Both must happen in one invocation of `/new-llm-wiki`. Two extreme designs are possible:
 
 - **Fully deterministic**: a script does everything, including generating the seed questions from a template. Downside: seed questions become generic ("What are the main entities?"), losing the whole point of tailoring them to the user's specific project.
 - **Fully LLM-driven**: the LLM creates directories, writes files, substitutes placeholders. Downside: non-deterministic output, no guaranteed reproducibility, high risk of quietly violating Karpathy invariants (e.g. pre-populating `wiki/entities/` "helpfully").

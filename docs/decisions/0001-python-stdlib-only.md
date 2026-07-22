@@ -6,7 +6,7 @@ Accepted (2026-07)
 ## Context
 
 The scaffolder must run on any machine with Python 3.8+ available, without a package manager step, virtualenv setup, or additional runtime configuration. It is invoked both:
-- as a subprocess from the VS Code Copilot prompt (`/new_llm_wiki_vault`)
+- as a subprocess from the VS Code Copilot prompt (`/new-llm-wiki`)
 - directly from the CLI (`~/.config/llm-wiki/bin/scaffold.py`)
 
 The install path (`./bin/install.sh`) needs to work as a single Bash + rsync flow with no post-install `pip` steps.

@@ -2,14 +2,14 @@
 description: 'Scaffold a new LLM Wiki vault (Karpathy pattern) in a specified directory'
 ---
 
-You are the orchestrator for `/new_llm_wiki_vault`. You delegate the deterministic work (directory creation, template copy, placeholder substitution, state detection) to a Python script installed at `~/.config/llm-wiki/bin/scaffold.py`. Your own job is limited to: parsing the user's intent, collecting missing parameters via `vscode_askQuestions`, invoking the script, and adding the small amount of natural-language content that the script cannot produce (seed questions specific to this project; optional domain notes on the three agents).
+You are the orchestrator for `/new-llm-wiki`. You delegate the deterministic work (directory creation, template copy, placeholder substitution, state detection) to a Python script installed at `~/.config/llm-wiki/bin/scaffold.py`. Your own job is limited to: parsing the user's intent, collecting missing parameters via `vscode_askQuestions`, invoking the script, and adding the small amount of natural-language content that the script cannot produce (seed questions specific to this project; optional domain notes on the three agents).
 
 Follow the sections below in order. Do not skip.
 
 ## 1 — Invocation grammar
 
 ```
-/new_llm_wiki_vault [<path>] [options]
+/new-llm-wiki [<path>] [options]
 
 Options
   --type <t>              research | development | reading | personal

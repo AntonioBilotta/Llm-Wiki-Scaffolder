@@ -31,7 +31,7 @@ Options:
 Installed paths (default):
   ~/.config/llm-wiki/bin/scaffold.py
   ~/.config/llm-wiki/templates/
-  <VS Code user prompts folder>/new_llm_wiki_vault.prompt.md
+  <VS Code user prompts folder>/new-llm-wiki.prompt.md
 
 Re-run to update. Templates are synced with rsync --delete, so the runtime
 copy always matches the repo. Local edits to the runtime templates will
@@ -108,7 +108,11 @@ INSTALL_ROOT="$HOME/.config/llm-wiki"
 INSTALL_BIN="$INSTALL_ROOT/bin"
 INSTALL_TEMPLATES="$INSTALL_ROOT/templates"
 INSTALL_SCAFFOLD="$INSTALL_BIN/scaffold.py"
-INSTALL_PROMPT="$VSCODE_PROMPTS_DIR/new_llm_wiki_vault.prompt.md"
+INSTALL_PROMPT="$VSCODE_PROMPTS_DIR/new-llm-wiki.prompt.md"
+# Legacy: prior versions installed the scaffold prompt as new_llm_wiki_vault.prompt.md.
+# Kept here so install and uninstall clean up the old filename on machines that had
+# a previous install (per ADR-0002 Erratum: naming update).
+LEGACY_INSTALL_PROMPT="$VSCODE_PROMPTS_DIR/new_llm_wiki_vault.prompt.md"
 
 # ---------------------------------------------------------------------------
 # Uninstall
@@ -117,7 +121,7 @@ INSTALL_PROMPT="$VSCODE_PROMPTS_DIR/new_llm_wiki_vault.prompt.md"
 if [ "$ACTION" = "uninstall" ]; then
     echo "Uninstalling llm-wiki-scaffolder..."
     removed=0
-    for target in "$INSTALL_SCAFFOLD" "$INSTALL_PROMPT"; do
+    for target in "$INSTALL_SCAFFOLD" "$INSTALL_PROMPT" "$LEGACY_INSTALL_PROMPT"; do
         if [ -f "$target" ]; then
             rm -f -- "$target"
             echo "  removed: $target"
@@ -164,12 +168,17 @@ install -m 0755 "$REPO_ROOT/bin/scaffold.py" "$INSTALL_SCAFFOLD"
 
 # Prompt: copy to VS Code user prompts folder.
 if [ "$SKIP_PROMPT" = "false" ]; then
-    if [ ! -f "$REPO_ROOT/prompts/new_llm_wiki_vault.prompt.md" ]; then
-        echo "error: missing prompt file at $REPO_ROOT/prompts/new_llm_wiki_vault.prompt.md" >&2
+    if [ ! -f "$REPO_ROOT/prompts/new-llm-wiki.prompt.md" ]; then
+        echo "error: missing prompt file at $REPO_ROOT/prompts/new-llm-wiki.prompt.md" >&2
         exit 1
     fi
     mkdir -p -- "$VSCODE_PROMPTS_DIR"
-    install -m 0644 "$REPO_ROOT/prompts/new_llm_wiki_vault.prompt.md" "$INSTALL_PROMPT"
+    # Remove legacy prompt file if present (renamed 2026-07 per ADR-0002 Erratum).
+    if [ -f "$LEGACY_INSTALL_PROMPT" ]; then
+        rm -f -- "$LEGACY_INSTALL_PROMPT"
+        echo "  removed legacy prompt: $LEGACY_INSTALL_PROMPT"
+    fi
+    install -m 0644 "$REPO_ROOT/prompts/new-llm-wiki.prompt.md" "$INSTALL_PROMPT"
 fi
 
 # ---------------------------------------------------------------------------
@@ -196,7 +205,7 @@ echo "Next steps:"
 if [ "$SKIP_PROMPT" = "false" ]; then
     echo "  1. Reload VS Code:  Cmd/Ctrl+Shift+P → 'Developer: Reload Window'"
     echo "  2. In any workspace, in Copilot chat:"
-    echo "       /new_llm_wiki_vault --help"
+    echo "       /new-llm-wiki --help"
     echo "     (or invoke with args to create a vault directly)"
 else
     echo "  Run:  $INSTALL_SCAFFOLD --help"

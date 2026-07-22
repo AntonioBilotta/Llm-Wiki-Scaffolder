@@ -1,6 +1,6 @@
 # llm-wiki-scaffolder
 
-Deterministic scaffolder for **LLM Wiki** vaults following the [Karpathy pattern](templates/karpathy_llm_wiki_pattern.md). Installs a user-level slash-command (`/new_llm_wiki_vault`) for GitHub Copilot Chat in VS Code, backed by a stdlib-only Python script.
+Deterministic scaffolder for **LLM Wiki** vaults following the [Karpathy pattern](templates/karpathy_llm_wiki_pattern.md). Installs a user-level slash-command (`/new-llm-wiki`) for GitHub Copilot Chat in VS Code, backed by a stdlib-only Python script.
 
 An LLM Wiki is a persistent, LLM-maintained knowledge base: `raw/` holds immutable sources, `wiki/` holds LLM-owned markdown (entities, concepts, sources, analysis, plus domain-specific folders), and the LLM keeps the wiki up-to-date as new sources are added. Three commands drive it: `/wiki-ingest`, `/wiki-lint`, `@wiki-reader`.
 
@@ -30,7 +30,7 @@ Prerequisites: Python 3.8+, `git`, VS Code with GitHub Copilot Chat.
 
 ---
 
-Then reload the VS Code window (`Cmd/Ctrl+Shift+P → Developer: Reload Window`). The command `/new_llm_wiki_vault` is now available in Copilot Chat from **any** workspace.
+Then reload the VS Code window (`Cmd/Ctrl+Shift+P → Developer: Reload Window`). The command `/new-llm-wiki` is now available in Copilot Chat from **any** workspace.
 
 ### VS Code Insiders
 
@@ -49,10 +49,10 @@ Then reload the VS Code window (`Cmd/Ctrl+Shift+P → Developer: Reload Window`)
 In Copilot Chat, from any workspace:
 
 ```
-/new_llm_wiki_vault                                 # full wizard
-/new_llm_wiki_vault --help                          # print script usage and stop
-/new_llm_wiki_vault ~/Vaults/my-vault               # path + wizard for the rest
-/new_llm_wiki_vault ~/Vaults/lotr --type reading --fiction \
+/new-llm-wiki                                 # full wizard
+/new-llm-wiki --help                          # print script usage and stop
+/new-llm-wiki ~/Vaults/my-vault               # path + wizard for the rest
+/new-llm-wiki ~/Vaults/lotr --type reading --fiction \
     --name "LOTR" --desc "Reading Tolkien" --lang english
 ```
 

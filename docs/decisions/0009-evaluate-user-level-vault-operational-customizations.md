@@ -5,7 +5,7 @@ Proposed (2026-07)
 
 ## Context
 
-Today, when `/new_llm_wiki_vault` scaffolds a new vault, it materializes the full set of operational customization files inside the vault's `.github/` directory:
+Today, when `/new-llm-wiki` scaffolds a new vault, it materializes the full set of operational customization files inside the vault's `.github/` directory:
 
 ```
 <vault>/.github/
