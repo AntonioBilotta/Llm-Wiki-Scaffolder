@@ -44,3 +44,22 @@ If a genuine need for a compulsory-archival query emerges, the right answer is a
 - **Add `/wiki-query --archive "<question>"`, `--format table`, etc.** — deferred. Interesting only if users routinely need those flags. Current usage doesn't demonstrate the need.
 - **Add `/wiki-archive "<question>"` (compulsory-archival variant)** — deferred, not rejected. Genuinely distinct from the mention (skips approval), aligned with the Karpathy "compound explorations back into the wiki" idea. Add if the archival step feels like recurring friction.
 - **Rename `@wiki-reader` to something more inviting** — out of scope for this ADR; the name aligns with the "reader/maintainer/auditor" role naming ([ADR-0004](0004-three-fixed-roles.md)).
+
+## Erratum (2026-07)
+
+The Context and Decision sections of this ADR reflect the pre-[ADR-0009](0009-evaluate-user-level-vault-operational-customizations.md) architecture, in which prompts delegated to vault-level agents via `agent:` frontmatter. Under that constraint, `/wiki-query` would have been a thin wrapper reintroducing cross-workspace fragility — the argument against it held.
+
+Under **Model D** (formalized in ADR-0009), prompts are self-contained user-level orchestrators of skills, with no `agent:` delegation. This changes the trade-off:
+
+- **Cross-surface use** (Copilot CLI, third-party skills like OpenSpec composing wiki operations) benefits from a one-shot programmatic entry point that does not require a vault workspace to be active.
+- **The Ingest/Query/Lint symmetry closes cleanly** — 2 of 3 slash-commands (`/wiki-ingest`, `/wiki-lint`) already existed under Model D; the missing 3rd was Query.
+- `@wiki-reader` remains as vault-level agent for interactive conversational use with domain guardrails (spoiler-safe reading, PII redaction, ADR format). It is **not** replaced.
+
+**Decision update**: `/wiki-query` is added as a **user-level prompt** — self-contained, orchestrates skills directly, no agent delegation. It coexists with `@wiki-reader`:
+
+- `/wiki-query <question> [--archive]` — one-shot orchestrator, cross-surface, generic behavior. Lives at [prompts/wiki-query.prompt.md](../../prompts/wiki-query.prompt.md).
+- `@wiki-reader` — vault-level agent (optional per Model D `--with-agents`), interactive, applies domain notes and tool restriction.
+
+The original rejection of *"`/wiki-query` as a thin wrapper delegating to an agent"* **still stands** — that specific antipattern would still reintroduce cross-workspace dependency. The new `/wiki-query` avoids it by orchestrating skills directly.
+
+Status remains `Accepted`, with the Decision widened per the above.
