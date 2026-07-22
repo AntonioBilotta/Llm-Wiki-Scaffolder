@@ -1,6 +1,15 @@
 # ADR-0011: Skill token optimization strategies (deferred)
 
 ## Status
+**Superseded by [ADR-0010](0010-eliminate-wiki-detect-vault.md) (2026-07).** The primary detection optimization identified in this ADR was addressed architecturally (elimination of the `wiki-detect-vault` skill) rather than via the incremental env-var / progressive-disclosure optimizations documented below. This document is preserved for historical reference — the token cost analysis and the discussion of alternatives remain useful as background reading, but the recommended actions no longer apply.
+
+For the current approach, see ADR-0010.
+
+---
+
+## Original text (preserved as historical record)
+
+## (original) Status
 Proposed (2026-07)
 
 ## Context

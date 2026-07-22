@@ -898,6 +898,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         "{{DOMAIN_EXTRA_TYPES}}": extra_types_str,
         "{{DOMAIN_SPECIFIC_CONVENTIONS}}": config["conventions"],
         "{{TODAY}}": today,
+        "{{VAULT_PATH}}": str(vault.resolve()),
     }
 
     dirs, ops = build_plan(

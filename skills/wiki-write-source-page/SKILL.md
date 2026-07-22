@@ -23,7 +23,7 @@ Parse stdout as JSON. The script (stdlib only, ~140 lines) implements the algori
 
 ## Algorithm
 
-1. **Resolve `vault_path`** (via argument or `wiki-detect-vault`).
+1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
 
 2. **Parse `summary`** — a YAML or JSON structure matching the return shape of `wiki-summarize-source`.
 

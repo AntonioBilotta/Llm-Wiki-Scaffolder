@@ -265,6 +265,14 @@ if (-not $NoSkills) {
     }
     foreach ($root in $SkillRoots) {
         New-Item -ItemType Directory -Force -Path $root | Out-Null
+        # Remove legacy skill wiki-detect-vault if present (eliminated 2026-07
+        # per ADR-0010: vault path is authoritative in the workspace's
+        # .github/copilot-instructions.md, no detection skill needed).
+        $LegacyDetect = Join-Path $root "wiki-detect-vault"
+        if (Test-Path $LegacyDetect) {
+            Remove-Item -Recurse -Force $LegacyDetect
+            Write-Host "  removed legacy skill: $LegacyDetect\"
+        }
         Get-ChildItem -Path $SkillsSource -Filter "wiki-*" -Directory | ForEach-Object {
             $dest = Join-Path $root $_.Name
             # Remove existing to ensure clean state (equivalent to rsync --delete)

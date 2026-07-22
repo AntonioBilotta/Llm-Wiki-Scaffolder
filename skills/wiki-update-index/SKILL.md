@@ -25,7 +25,7 @@ Parse stdout as JSON. If the target section does not exist, the script appends i
 
 ## Algorithm
 
-1. **Resolve `vault_path`** (via argument or `wiki-detect-vault`).
+1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
 
 2. **Read** `<vault_path>/wiki/index.md`. If it does not exist, create it with a minimal `# Index` heading, then continue.
 

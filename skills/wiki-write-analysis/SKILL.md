@@ -26,7 +26,7 @@ Parse stdout as JSON. The script (stdlib only) writes the file with standard fro
 
 ## Algorithm
 
-1. **Resolve `vault_path`** (via argument or `wiki-detect-vault`).
+1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
 
 2. **Compute the target filename:**
    - Snake_case slug from `title`.

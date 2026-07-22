@@ -5,6 +5,13 @@
 
 This workspace contains an **LLM Wiki** — a persistent, LLM-maintained knowledge base following the [Karpathy pattern](./karpathy_llm_wiki_pattern.md).
 
+## Vault
+
+- **Path:** `{{VAULT_PATH}}`
+- **Type:** `{{DOMAIN_TYPE}}`
+
+> **Note for LLMs orchestrating wiki-* skills:** the absolute path above is the authoritative `vault_path`. Pass it as the `vault_path` argument to every wiki-* skill invocation (`wiki-search`, `wiki-read-page`, `wiki-write-source-page`, `wiki-write-analysis`, `wiki-update-index`, `wiki-append-log`, `wiki-summarize-source`, `wiki-lint-check`). Do not attempt to detect the vault path by walking the filesystem — this file is the single source of truth. See [ADR-0010](https://github.com/AntonioBilotta/Llm-Wiki-Scaffolder/blob/main/docs/decisions/0010-eliminate-wiki-detect-vault.md).
+
 ## Layout
 
 - `raw/` — **immutable** source material. Only the user writes here. **Never** modify anything under `raw/`.

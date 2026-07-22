@@ -25,7 +25,7 @@ Parse stdout as JSON. The script enforces that `--kind` is a single lowercase wo
 
 ## Algorithm
 
-1. **Resolve `vault_path`** (via argument or `wiki-detect-vault`).
+1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
 
 2. **Ensure the log file exists.** If `<vault_path>/wiki/log.md` is absent, create it with a `# Log` heading. If present, preserve its content exactly.
 

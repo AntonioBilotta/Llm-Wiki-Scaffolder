@@ -158,11 +158,10 @@ Rationale detailed in [ADR-0001](docs/decisions/0001-python-stdlib-only.md) and 
 
 ### 4. Skills layer (NEW under Model D) — [skills/](skills/)
 
-**What it is:** 9 user-level atomic capabilities packaged as `SKILL.md` files, five of which bundle a stdlib-only Python script under `scripts/` for single-file, blast-radius-bounded write operations.
+**What it is:** 8 user-level atomic capabilities packaged as `SKILL.md` files, four of which bundle a stdlib-only Python script under `scripts/` for single-file, blast-radius-bounded write operations. The vault path is not detected — it is read from the auto-loaded `.github/copilot-instructions.md` under `## Vault / **Path:**` (see [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md)) and passed as `vault_path` argument to every skill by the caller.
 
 | Skill | Kind | Purpose |
 |---|---|---|
-| `wiki-detect-vault` | pure reasoning | Locate the active LLM Wiki vault by walking up the CWD |
 | `wiki-search` | pure reasoning | Rank pages in `wiki/index.md` by relevance |
 | `wiki-read-page` | pure reasoning | Read a wiki page with parsed frontmatter + wikilinks |
 | `wiki-summarize-source` | pure reasoning | Produce a structured summary of a `raw/` source |

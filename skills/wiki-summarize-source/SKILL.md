@@ -10,7 +10,7 @@ Produce a structured summary of a raw source, ready to be consumed by ingest orc
 
 ## Algorithm
 
-1. **Resolve `vault_path`** (via argument or `wiki-detect-vault`).
+1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
 
 2. **Locate the source** at `<vault_path>/<source_path>` (or `<source_path>` if absolute).
    - Text/Markdown/HTML files: read directly.

@@ -7,17 +7,17 @@ Run a full LINT pass on the LLM Wiki. Compose user-level skills — do not deleg
 
 ## Workflow
 
-1. Invoke `wiki-detect-vault` to resolve the target vault. If a vault-level `@wiki-auditor` agent is active, it may intercept this prompt to apply its domain guardrails; follow it if so. Otherwise proceed with the steps below.
+1. **Resolve `vault_path`**: read the absolute path from the auto-loaded `.github/copilot-instructions.md` in the current workspace (field `**Path:**` under the `## Vault` heading). If a vault-level `@wiki-auditor` agent is active, it may intercept this prompt to apply its domain guardrails; follow it if so. Otherwise proceed with the steps below.
 
-2. Invoke `wiki-lint-check` with `format=md` and any `${input:scope}` provided. Present the human-readable report to the user.
+2. Apply `wiki-lint-check` with `vault_path=<from step 1>`, `format=md`, and any `${input:scope}` provided. Present the human-readable report to the user.
 
-3. Invoke `wiki-lint-check` a second time with default JSON output (same scope). Parse the JSON, focusing on `findings.frontmatter` entries marked `auto_repairable: true`.
+3. Apply `wiki-lint-check` a second time with `vault_path=<...>` and default JSON output (same scope). Parse the JSON, focusing on `findings.frontmatter` entries marked `auto_repairable: true`.
 
 4. For each auto-repairable finding, apply the `proposed_fix` using the platform `edit` tool. Repair only frontmatter metadata — never edit page content in a lint pass.
 
 5. For every other finding (contradictions, orphans, missing cross-refs, stale claims, missing pages, knowledge gaps, non-trivial frontmatter issues), surface them to the user in the report — do NOT act on them. These require user approval and typically fall under the maintainer's scope, not the auditor's.
 
-6. Invoke `wiki-append-log` with `kind=lint`, `summary=<N> contradictions, <N> orphans, <N> stale, auto-repaired <N> frontmatter`.
+6. Apply `wiki-append-log` with `vault_path=<...>`, `kind=lint`, `summary=<N> contradictions, <N> orphans, <N> stale, auto-repaired <N> frontmatter`.
 
 ## Output format
 

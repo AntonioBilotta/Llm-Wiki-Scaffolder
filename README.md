@@ -139,7 +139,7 @@ Removes installed files and the VS Code user prompt. Vaults created with the sca
     .gitignore
 ```
 
-**Vault-level prompts are NOT scaffolded under Model D** — the `/wiki-ingest`, `/wiki-lint`, `/wiki-query` slash-commands are installed at user level and work from any workspace containing an LLM Wiki vault (auto-detected via the `wiki-detect-vault` skill).
+**Vault-level prompts are NOT scaffolded under Model D** — the `/wiki-ingest`, `/wiki-lint`, `/wiki-query` slash-commands are installed at user level and work from any workspace containing an LLM Wiki vault. The vault path is read from the auto-loaded `.github/copilot-instructions.md` (`## Vault / **Path:**` field), which the scaffolder writes at vault creation time — see [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md).
 
 **Agents are optional per domain**: `business` and `personal` include them by default (stricter roles for sensitive data), `research`/`development`/`reading`/`learning`/`hobby` do not. Override with `--with-agents` or `--minimal` at scaffold time.
 

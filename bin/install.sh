@@ -228,6 +228,14 @@ if [ "$SKIP_SKILLS" = "false" ]; then
     fi
     for root in "${SKILL_ROOTS[@]}"; do
         mkdir -p -- "$root"
+        # Remove legacy skill wiki-detect-vault if present (eliminated 2026-07
+        # per ADR-0010: vault path is authoritative in the workspace's
+        # .github/copilot-instructions.md, no detection skill needed).
+        legacy_detect="$root/wiki-detect-vault"
+        if [ -d "$legacy_detect" ]; then
+            rm -rf -- "$legacy_detect"
+            echo "  removed legacy skill: $legacy_detect/"
+        fi
         for src in "$REPO_ROOT/skills"/wiki-*; do
             if [ -d "$src" ]; then
                 dest="$root/$(basename "$src")"

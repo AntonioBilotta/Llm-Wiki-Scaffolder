@@ -10,7 +10,7 @@ Produce a Lint Report by running 7 checks over the vault. No writes.
 
 ## Algorithm
 
-1. **Resolve `vault_path`** (via argument or `wiki-detect-vault`).
+1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
 
 2. **Determine scope:**
    - `scope=vault` (default) — every markdown file under `<vault_path>/wiki/` except `index.md`, `log.md`, `overview.md`.
