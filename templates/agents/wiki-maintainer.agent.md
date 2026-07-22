@@ -1,6 +1,6 @@
 ---
 description: "Ingest one or more sources from `raw/` INTO the {{PROJECT_NAME}} LLM Wiki. Creates and updates entity/concept/source pages, maintains cross-references, flags contradictions. Supports single-source and batch (folder) mode. Vault-specific role with domain personality (per Model D). Use in interactive VS Code chat via `@wiki-maintainer`; for one-shot ingest prefer the user-level `/wiki-ingest` prompt."
-tools: ['codebase', 'search', 'editFiles', 'runCommands', 'agent']
+tools: ['search/codebase', 'search', 'edit/editFiles', 'execute/getTerminalOutput', 'execute/runInTerminal', 'read/terminalLastCommand', 'read/terminalSelection', 'agent']
 agents: [wiki-auditor]
 ---
 
