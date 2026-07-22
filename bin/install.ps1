@@ -17,7 +17,10 @@
     Target VS Code Insiders instead of stable.
 
 .PARAMETER NoPrompt
-    Skip copying the VS Code user prompt.
+    Skip copying the VS Code user prompts (scaffold + wiki-*).
+
+.PARAMETER NoSkills
+    Skip installing user-level wiki-* skills.
 
 .EXAMPLE
     .\bin\install.ps1
@@ -36,7 +39,8 @@
 param(
     [switch]$Uninstall,
     [switch]$Insiders,
-    [switch]$NoPrompt
+    [switch]$NoPrompt,
+    [switch]$NoSkills
 )
 
 Set-StrictMode -Version Latest
@@ -117,6 +121,15 @@ $InstallPrompt = Join-Path $VSCodePromptsDir "new-llm-wiki.prompt.md"
 # a previous install (per ADR-0002 Erratum: naming update).
 $LegacyInstallPrompt = Join-Path $VSCodePromptsDir "new_llm_wiki_vault.prompt.md"
 
+# Skill destinations (per ADR-0009 Model D, resolved decision Q2 = Option B):
+# copy each wiki-* skill to all three known Copilot skill roots so any host
+# that consumes the Agent Skills open standard can discover them.
+$SkillRoots = @(
+    (Join-Path $env:USERPROFILE ".copilot\skills"),
+    (Join-Path $env:USERPROFILE ".claude\skills"),
+    (Join-Path $env:USERPROFILE ".agents\skills")
+)
+
 # ---------------------------------------------------------------------------
 # Uninstall
 # ---------------------------------------------------------------------------
@@ -130,6 +143,28 @@ if ($Uninstall) {
             Remove-Item -Force $target
             Write-Host "  removed: $target"
             $removed++
+        }
+    }
+
+    # Wiki-* prompts (ingest, lint, query, ...).
+    if (Test-Path $VSCodePromptsDir) {
+        Get-ChildItem -Path $VSCodePromptsDir -Filter "wiki-*.prompt.md" -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                Remove-Item -Force $_.FullName
+                Write-Host "  removed: $($_.FullName)"
+                $removed++
+            }
+    }
+
+    # Wiki-* skills across all three destinations.
+    foreach ($root in $SkillRoots) {
+        if (Test-Path $root) {
+            Get-ChildItem -Path $root -Filter "wiki-*" -Directory -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    Remove-Item -Recurse -Force $_.FullName
+                    Write-Host "  removed: $($_.FullName)\"
+                    $removed++
+                }
         }
     }
 
@@ -162,7 +197,10 @@ Write-Host "Installing llm-wiki-scaffolder from $RepoRoot"
 Write-Host "  scaffold:  $InstallScaffold"
 Write-Host "  templates: $InstallTemplates\"
 if (-not $NoPrompt) {
-    Write-Host "  prompt:    $InstallPrompt"
+    Write-Host "  prompts:   $VSCodePromptsDir\{new-llm-wiki,wiki-*}.prompt.md"
+}
+if (-not $NoSkills) {
+    Write-Host "  skills:    %USERPROFILE%\.copilot\skills\wiki-*\  (and .claude, .agents mirrors)"
 }
 Write-Host ""
 
@@ -196,7 +234,7 @@ Get-ChildItem $TemplatesSource -Recurse |
 # Script: copy scaffold.py
 Copy-Item -Force $ScaffoldPy $InstallScaffold
 
-# Prompt: copy to VS Code user prompts folder
+# Prompts: copy to VS Code user prompts folder (scaffold + wiki-* verbs)
 # ($PromptSource existence was validated at prerequisites time.)
 if (-not $NoPrompt) {
     New-Item -ItemType Directory -Force -Path $VSCodePromptsDir | Out-Null
@@ -206,6 +244,37 @@ if (-not $NoPrompt) {
         Write-Host "  removed legacy prompt: $LegacyInstallPrompt"
     }
     Copy-Item -Force $PromptSource $InstallPrompt
+
+    # Wiki-* prompts (ingest, lint, query, ...) — enumerated by glob so future
+    # additions are picked up automatically.
+    $PromptsDir = Join-Path $RepoRoot "prompts"
+    Get-ChildItem -Path $PromptsDir -Filter "wiki-*.prompt.md" -File | ForEach-Object {
+        $dest = Join-Path $VSCodePromptsDir $_.Name
+        Copy-Item -Force $_.FullName $dest
+        Write-Host "  installed prompt: $dest"
+    }
+}
+
+# Skills: copy each wiki-* skill directory to all three known Copilot skill
+# roots for maximum portability (VS Code, Copilot CLI, Claude Code, etc.).
+if (-not $NoSkills) {
+    $SkillsSource = Join-Path $RepoRoot "skills"
+    if (-not (Test-Path $SkillsSource)) {
+        Write-Error "Missing skills/ directory at $SkillsSource"
+        exit 1
+    }
+    foreach ($root in $SkillRoots) {
+        New-Item -ItemType Directory -Force -Path $root | Out-Null
+        Get-ChildItem -Path $SkillsSource -Filter "wiki-*" -Directory | ForEach-Object {
+            $dest = Join-Path $root $_.Name
+            # Remove existing to ensure clean state (equivalent to rsync --delete)
+            if (Test-Path $dest) {
+                Remove-Item -Recurse -Force $dest
+            }
+            Copy-Item -Recurse -Force $_.FullName $dest
+            Write-Host "  installed skill: $dest\"
+        }
+    }
 }
 
 # ---------------------------------------------------------------------------

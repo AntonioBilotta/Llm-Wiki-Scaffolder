@@ -9,6 +9,7 @@
 # Idempotent. Safe to re-run for updates.
 
 set -euo pipefail
+shopt -s nullglob
 
 # ---------------------------------------------------------------------------
 # CLI
@@ -17,6 +18,7 @@ set -euo pipefail
 ACTION="install"
 INSIDERS=false
 SKIP_PROMPT=false
+SKIP_SKILLS=false
 
 show_help() {
     cat <<'EOF'
@@ -25,17 +27,20 @@ Usage: ./bin/install.sh [options]
 Options:
   --uninstall       Remove installed files (does not touch this repo)
   --insiders        Target VS Code Insiders instead of stable
-  --no-prompt       Skip copying the VS Code user prompt
+  --no-prompt       Skip copying the VS Code user prompts (scaffold + wiki-*)
+  --no-skills       Skip installing user-level wiki-* skills
   --help, -h        Show this help
 
 Installed paths (default):
   ~/.config/llm-wiki/bin/scaffold.py
   ~/.config/llm-wiki/templates/
   <VS Code user prompts folder>/new-llm-wiki.prompt.md
+  <VS Code user prompts folder>/wiki-{ingest,lint,query}.prompt.md
+  ~/.copilot/skills/wiki-*/   (and .claude, .agents mirrors)
 
-Re-run to update. Templates are synced with rsync --delete, so the runtime
-copy always matches the repo. Local edits to the runtime templates will
-be lost — edit the repo copy and re-run.
+Re-run to update. Templates and skills are synced with rsync --delete,
+so runtime copies always match the repo. Local edits to runtime files
+will be lost — edit the repo copy and re-run.
 EOF
 }
 
@@ -44,6 +49,7 @@ while [ $# -gt 0 ]; do
         --uninstall) ACTION="uninstall" ;;
         --insiders) INSIDERS=true ;;
         --no-prompt) SKIP_PROMPT=true ;;
+        --no-skills) SKIP_SKILLS=true ;;
         --help|-h) show_help; exit 0 ;;
         *) echo "error: unknown option: $1" >&2; show_help >&2; exit 1 ;;
     esac
@@ -114,6 +120,15 @@ INSTALL_PROMPT="$VSCODE_PROMPTS_DIR/new-llm-wiki.prompt.md"
 # a previous install (per ADR-0002 Erratum: naming update).
 LEGACY_INSTALL_PROMPT="$VSCODE_PROMPTS_DIR/new_llm_wiki_vault.prompt.md"
 
+# Skill destinations (per ADR-0009 Model D, resolved decision Q2 = Option B):
+# copy each wiki-* skill to all three known Copilot skill roots so any host
+# that consumes the Agent Skills open standard can discover them.
+SKILL_ROOTS=(
+    "$HOME/.copilot/skills"
+    "$HOME/.claude/skills"
+    "$HOME/.agents/skills"
+)
+
 # ---------------------------------------------------------------------------
 # Uninstall
 # ---------------------------------------------------------------------------
@@ -121,12 +136,24 @@ LEGACY_INSTALL_PROMPT="$VSCODE_PROMPTS_DIR/new_llm_wiki_vault.prompt.md"
 if [ "$ACTION" = "uninstall" ]; then
     echo "Uninstalling llm-wiki-scaffolder..."
     removed=0
-    for target in "$INSTALL_SCAFFOLD" "$INSTALL_PROMPT" "$LEGACY_INSTALL_PROMPT"; do
+    # Scaffold script + user-level prompts (scaffold + wiki-*) + legacy prompt.
+    for target in "$INSTALL_SCAFFOLD" "$INSTALL_PROMPT" "$LEGACY_INSTALL_PROMPT" \
+                  "$VSCODE_PROMPTS_DIR"/wiki-*.prompt.md; do
         if [ -f "$target" ]; then
             rm -f -- "$target"
             echo "  removed: $target"
             removed=$((removed + 1))
         fi
+    done
+    # Wiki-* skills across all three destinations.
+    for root in "${SKILL_ROOTS[@]}"; do
+        for skill_dir in "$root"/wiki-*; do
+            if [ -d "$skill_dir" ]; then
+                rm -rf -- "$skill_dir"
+                echo "  removed: $skill_dir/"
+                removed=$((removed + 1))
+            fi
+        done
     done
     if [ -d "$INSTALL_TEMPLATES" ]; then
         rm -rf -- "$INSTALL_TEMPLATES"
@@ -151,7 +178,10 @@ echo "Installing llm-wiki-scaffolder from $REPO_ROOT"
 echo "  scaffold:  $INSTALL_SCAFFOLD"
 echo "  templates: $INSTALL_TEMPLATES/"
 if [ "$SKIP_PROMPT" = "false" ]; then
-    echo "  prompt:    $INSTALL_PROMPT"
+    echo "  prompts:   $VSCODE_PROMPTS_DIR/{new-llm-wiki,wiki-*}.prompt.md"
+fi
+if [ "$SKIP_SKILLS" = "false" ]; then
+    echo "  skills:    ~/.copilot/skills/wiki-*/  (and .claude, .agents mirrors)"
 fi
 echo ""
 
@@ -166,7 +196,7 @@ rsync -a --delete \
 # Script: install with executable bit.
 install -m 0755 "$REPO_ROOT/bin/scaffold.py" "$INSTALL_SCAFFOLD"
 
-# Prompt: copy to VS Code user prompts folder.
+# Prompts: copy to VS Code user prompts folder (scaffold + wiki-* verbs).
 if [ "$SKIP_PROMPT" = "false" ]; then
     if [ ! -f "$REPO_ROOT/prompts/new-llm-wiki.prompt.md" ]; then
         echo "error: missing prompt file at $REPO_ROOT/prompts/new-llm-wiki.prompt.md" >&2
@@ -179,6 +209,35 @@ if [ "$SKIP_PROMPT" = "false" ]; then
         echo "  removed legacy prompt: $LEGACY_INSTALL_PROMPT"
     fi
     install -m 0644 "$REPO_ROOT/prompts/new-llm-wiki.prompt.md" "$INSTALL_PROMPT"
+    # Wiki-* prompts (ingest, lint, query, ...) — enumerated by glob so future
+    # additions are picked up automatically.
+    for src in "$REPO_ROOT/prompts"/wiki-*.prompt.md; do
+        dest="$VSCODE_PROMPTS_DIR/$(basename "$src")"
+        install -m 0644 "$src" "$dest"
+        echo "  installed prompt: $dest"
+    done
+fi
+
+# Skills: copy each wiki-* skill directory to all three known Copilot skill
+# roots for maximum portability (VS Code, Copilot CLI, Claude Code, etc.).
+# rsync --delete keeps runtime copies in sync with the repo.
+if [ "$SKIP_SKILLS" = "false" ]; then
+    if [ ! -d "$REPO_ROOT/skills" ]; then
+        echo "error: missing skills/ directory at $REPO_ROOT/skills" >&2
+        exit 1
+    fi
+    for root in "${SKILL_ROOTS[@]}"; do
+        mkdir -p -- "$root"
+        for src in "$REPO_ROOT/skills"/wiki-*; do
+            if [ -d "$src" ]; then
+                dest="$root/$(basename "$src")"
+                rsync -a --delete \
+                    --exclude='.DS_Store' --exclude='Thumbs.db' --exclude='.git*' \
+                    "$src/" "$dest/"
+                echo "  installed skill: $dest/"
+            fi
+        done
+    done
 fi
 
 # ---------------------------------------------------------------------------
