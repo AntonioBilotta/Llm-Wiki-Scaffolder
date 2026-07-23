@@ -2,6 +2,7 @@
 name: wiki-read-page
 description: Read a specific LLM Wiki page and return its structured content — YAML frontmatter parsed into fields, body as markdown, and extracted `[[wikilinks]]`. Use after `wiki-search` identifies a relevant page, when following a cross-reference from another page, when the user references a wiki page by name, or when a downstream skill needs the page's content or metadata. Trigger keywords - 'read the wiki page for X', 'show me the entity Y', 'what does the concept page say about Z', 'load the wiki analysis of W'.
 argument-hint: "page=<name without .md> [vault_path=<absolute path>]"
+user-invocable: false
 ---
 
 # wiki-read-page

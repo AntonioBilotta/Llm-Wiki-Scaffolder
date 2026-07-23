@@ -3,6 +3,16 @@
 ## Status
 Accepted (2026-07)
 
+## Erratum (2026-07, post ADR-0012)
+
+The original text below describes the three roles as **workflow-complete agents** (each agent's body contains the full numbered workflow for its verb: QUERY / INGEST / LINT). Under [ADR-0012](0012-orchestration-skills-and-agent-delegation.md), agents are refactored as **domain-personality layers** on top of user-level orchestration skills (`wiki-query`, `wiki-ingest`, `wiki-lint`):
+
+- The **three roles remain** — the reader/maintainer/auditor distinction, their tools frontmatter, and their runtime enforcement (reader has no `edit/editFiles`; auditor has `edit/editFiles` but prompt-body forbids creating new pages) are unchanged.
+- What **changed**: the workflow logic moved from agent body to orchestration skill body. Agent bodies now contain `## Constraints` (domain rules) + `## Delegation` ("apply the wiki-X skill") + `## When to override` (inline escape hatch for domain-specific deviation the skill can't express).
+- **Net effect**: same three roles, thinner bodies, workflow in a single source of truth.
+
+The conclusion of ADR-0004 (three fixed roles, no rename per domain) stands unchanged. Only the internal representation of what a role "does" evolved.
+
 ## Context
 
 The Karpathy LLM Wiki pattern describes three distinct operations against the wiki:

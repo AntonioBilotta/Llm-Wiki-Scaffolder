@@ -20,8 +20,8 @@ flowchart TB
         direction TB
         R_INSTALL["bin/install.sh, install.ps1<br/>(idempotent)"]
         R_SCAFFOLD["bin/scaffold.py<br/>(Python 3.8+, stdlib only)"]
-        R_PROMPTS["prompts/<br/>new-llm-wiki, wiki-ingest,<br/>wiki-lint, wiki-query"]
-        R_SKILLS["skills/<br/>9 wiki-* skills<br/>(4 with scripts/*.py)"]
+        R_PROMPTS["prompts/<br/>new-llm-wiki (scaffold only)"]
+        R_SKILLS["skills/<br/>11 wiki-* skills<br/>(3 orchestration + 8 atomic;<br/>4 atomic bundle scripts/*.py)"]
         R_TEMPLATES["templates/<br/>├─ agents/ (reader, maintainer, auditor)<br/>├─ instructions/ (conventions)<br/>├─ overview/ (per domain)<br/>└─ AGENTS.md, copilot-instructions.md,<br/>   karpathy_llm_wiki_pattern.md"]
     end
 
@@ -103,7 +103,7 @@ flowchart TB
 - Syncs `templates/` bidirectionally to `~/.config/llm-wiki/templates/` (`rsync --delete` on Unix, `Copy-Item` on Windows) — files removed from the repo also disappear from the runtime copy.
 - Installs `scaffold.py` (`0755`) to `~/.config/llm-wiki/bin/`.
 - Installs 4 user-level prompts (`0644`) — `new-llm-wiki`, `wiki-ingest`, `wiki-lint`, `wiki-query` — to the VS Code user prompts folder.
-- Installs the 9 wiki-* skills to three destinations: `~/.copilot/skills/`, `~/.claude/skills/`, `~/.agents/skills/` (for cross-tool composability with Copilot CLI, Claude Code, and other agent runtimes).
+- Installs the 11 wiki-* skills (3 orchestration + 8 atomic) to three destinations: `~/.copilot/skills/`, `~/.claude/skills/`, `~/.agents/skills/` (for cross-tool composability with Copilot CLI, Claude Code, and other agent runtimes).
 - Cross-platform detection of the VS Code prompts folder (macOS/Linux/Windows, stable/Insiders).
 - Legacy cleanup: removes obsolete VS Code prompts (`new_llm_wiki_vault.prompt.md`) and any vault-level `.github/prompts/wiki-*.prompt.md` on `--upgrade` (these lived at vault level pre-Model D).
 - Sanity check: `scaffold.py --help` must run cleanly.
@@ -158,7 +158,17 @@ Rationale detailed in [ADR-0001](docs/decisions/0001-python-stdlib-only.md) and 
 
 ### 4. Skills layer (NEW under Model D) — [skills/](skills/)
 
-**What it is:** 8 user-level atomic capabilities packaged as `SKILL.md` files, four of which bundle a stdlib-only Python script under `scripts/` for single-file, blast-radius-bounded write operations. The vault path is not detected — it is read from the auto-loaded `.github/copilot-instructions.md` under `## Vault / **Path:**` (see [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md)) and passed as `vault_path` argument to every skill by the caller.
+**What it is:** 11 user-level capabilities packaged as `SKILL.md` files, organized in two sub-layers per [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md):
+
+**Orchestration skills** (3, visible in `/` picker): compose atomic skills into canonical workflows. These replace the earlier `/wiki-ingest`, `/wiki-lint`, `/wiki-query` prompts (see [ADR-0007](docs/decisions/0007-ingest-lint-remain-prompts.md) erratum).
+
+| Skill | Purpose |
+|---|---|
+| `wiki-ingest` | Full INGEST workflow: summarize → write source page → cross-refs → index → log. Single-source + batch (folder) modes. |
+| `wiki-query` | Full QUERY workflow: search → read pages → synthesize with `[[wikilink]]` citations → optional archival. |
+| `wiki-lint` | Full LINT workflow: run 7 audits (MD + JSON) → auto-repair unambiguous frontmatter → log. |
+
+**Atomic skills** (8, hidden from `/` picker via `user-invocable: false`): single-purpose primitives composed by orchestrators and agents. Four bundle a stdlib-only Python script under `scripts/` for single-file, blast-radius-bounded write operations. The vault path is not detected — it is read from the auto-loaded `.github/copilot-instructions.md` under `## Vault / **Path:**` (see [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md)) and passed as `vault_path` argument to every skill by the caller.
 
 | Skill | Kind | Purpose |
 |---|---|---|
@@ -181,18 +191,19 @@ Same rationale as the scaffolder ([ADR-0001](docs/decisions/0001-python-stdlib-o
 
 ### 5. Vault runtime layer — LLM-driven
 
-Once scaffolded, the vault operates with 4 user-level slash-prompts + 9 user-level skills + (optionally) 3 vault-level role agents:
+Once scaffolded, the vault operates with 1 user-level slash-prompt (`/new-llm-wiki`) + 11 user-level skills (3 orchestration + 8 atomic) + (optionally) 3 vault-level role agents that delegate to the orchestration skills. See [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md) for the 3-layer composition rationale.
 
 | Component | Level | Type | Executed by | Determinism |
 |---|---|---|---|---|
 | `wiki-conventions.instructions.md` | vault | Instructions (`applyTo`) | LLM auto-loads on `wiki/**` and `raw/**` | Static, pattern-matched |
-| 9 `wiki-*` skills | user | Skill (playbook, some with scripts) | LLM applies when relevant or when orchestrated | Python scripts deterministic; playbook parts LLM |
-| `wiki-ingest.prompt.md` | user | Slash prompt | LLM (orchestrates skills) | Explicit ritual, INGEST workflow |
-| `wiki-lint.prompt.md` | user | Slash prompt | LLM (orchestrates skills) | Explicit ritual, LINT workflow |
-| `wiki-query.prompt.md` | user | Slash prompt | LLM (orchestrates skills) | Explicit ritual, QUERY workflow |
-| `wiki-reader.agent.md` | vault (opt) | Agent role | LLM via `@wiki-reader` | Runtime-enforced read-only (`tools:` no `editFiles`) |
-| `wiki-maintainer.agent.md` | vault (opt) | Agent role | LLM via `@wiki-maintainer` | Full `editFiles`+`runCommands`; can dispatch `@wiki-auditor` |
-| `wiki-auditor.agent.md` | vault (opt) | Agent role | LLM via `@wiki-auditor` or as subagent | `editFiles` for callouts + frontmatter fixes only (body-enforced no-create) |
+| 8 atomic wiki-* skills | user | Skill (playbook, some with scripts) | LLM applies when explicitly invoked by orchestrator/agent (`user-invocable: false`) | Python scripts deterministic; playbook parts LLM |
+| `wiki-ingest` skill | user | Orchestration skill | LLM via `/wiki-ingest` (or auto-invoke on natural language) | INGEST workflow |
+| `wiki-lint` skill | user | Orchestration skill | LLM via `/wiki-lint` | LINT workflow |
+| `wiki-query` skill | user | Orchestration skill | LLM via `/wiki-query` | QUERY workflow |
+| `new-llm-wiki.prompt.md` | user | Slash prompt | LLM (calls scaffold.py) | Explicit ritual, pre-vault only |
+| `wiki-reader.agent.md` | vault (opt) | Agent role | LLM via `@wiki-reader`; delegates to `wiki-query` skill | Runtime-enforced read-only (`tools:` no `edit/editFiles`) |
+| `wiki-maintainer.agent.md` | vault (opt) | Agent role | LLM via `@wiki-maintainer`; delegates to `wiki-ingest` skill | Full `edit/editFiles`+terminal; can dispatch `@wiki-auditor` |
+| `wiki-auditor.agent.md` | vault (opt) | Agent role | LLM via `@wiki-auditor` or as subagent; delegates to `wiki-lint` skill | `edit/editFiles` for callouts + frontmatter fixes only (body-enforced no-create) |
 
 **Why LLM-driven here:**
 - Runtime operations (ingest, query, lint) require irreducible semantic judgment: identifying entities, cross-references, contradictions, coverage gaps. A script cannot do this.
@@ -251,10 +262,12 @@ Each choice has a dedicated ADR under [docs/decisions/](docs/decisions/):
 1. **Python stdlib only** — [ADR-0001](docs/decisions/0001-python-stdlib-only.md)
 2. **User-level prompt, not skill** (original scaffold decision; generalized by ADR-0009) — [ADR-0002](docs/decisions/0002-user-level-prompt-not-skill.md)
 3. **Deterministic scaffold + LLM fill split** — [ADR-0003](docs/decisions/0003-deterministic-scaffold-llm-fill.md)
-4. **Three fixed roles** (reader/maintainer/auditor) — [ADR-0004](docs/decisions/0004-three-fixed-roles.md)
+4. **Three fixed roles** (reader/maintainer/auditor; roles remain, per ADR-0012 they become domain-personality layers) — [ADR-0004](docs/decisions/0004-three-fixed-roles.md)
 5. **Prompt vs agent invocation model** — [ADR-0005](docs/decisions/0005-prompt-vs-agent-invocation.md)
-6. **`/wiki-query` slash-command** (originally rejected in ADR-0006; added under Model D) — [ADR-0006](docs/decisions/0006-no-wiki-query-slash.md)
-7. **`/wiki-ingest` and `/wiki-lint` stay prompts (self-contained under Model D)** — [ADR-0007](docs/decisions/0007-ingest-lint-remain-prompts.md)
+6. **`/wiki-query` slash-command** (originally rejected in ADR-0006; added under Model D, now a skill) — [ADR-0006](docs/decisions/0006-no-wiki-query-slash.md)
+7. **`/wiki-ingest` and `/wiki-lint` stay prompts** (superseded by ADR-0012 — now orchestration skills) — [ADR-0007](docs/decisions/0007-ingest-lint-remain-prompts.md)
 8. **Windows support** — [ADR-0008](docs/decisions/0008-windows-support.md)
 9. **Model D architecture: skills+prompts at user level, agents optional per vault (Variant α composition)** — [ADR-0009](docs/decisions/0009-evaluate-user-level-vault-operational-customizations.md)
-10. **Skill token optimization strategies (deferred to pilot data)** — [ADR-0011](docs/decisions/0011-skill-token-optimization-strategies.md)
+10. **Eliminate wiki-detect-vault; vault path from copilot-instructions.md** — [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md)
+11. **Skill token optimization strategies (deferred)** — [ADR-0011](docs/decisions/0011-skill-token-optimization-strategies.md) (superseded by ADR-0010)
+12. **Orchestration skills + agent delegation (3-layer architecture)** — [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md)

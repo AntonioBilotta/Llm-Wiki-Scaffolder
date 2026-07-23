@@ -1,6 +1,13 @@
 # ADR-0007: `/wiki-ingest` and `/wiki-lint` stay prompts, not skills
 
 ## Status
+**Superseded by [ADR-0012](0012-orchestration-skills-and-agent-delegation.md) (2026-07)** for the `/wiki-ingest`, `/wiki-lint`, and `/wiki-query` triad, which are now user-level **orchestration skills** rather than prompts. The `/new-llm-wiki` scaffold command remains a prompt (pre-vault, no vault context to inherit from). See ADR-0012 for the rationale (Agent Skills open standard now has feature parity with prompts for our needs plus adds cross-tool portability + composability).
+
+---
+
+## Original text (preserved as historical record)
+
+### (original) Status
 Accepted (2026-07)
 
 ## Context

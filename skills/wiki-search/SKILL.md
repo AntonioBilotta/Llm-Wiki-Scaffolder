@@ -2,6 +2,7 @@
 name: wiki-search
 description: Search an LLM Wiki vault's page index for pages matching a query. Use when the user asks a question about content in a wiki they maintain, wants to look up a topic, find pages related to an entity or concept, discover what is already documented, or when another skill (e.g. OpenSpec) needs to check if a topic is covered before writing. Reads `wiki/index.md` and ranks matches by page name, summary, and section relevance. Trigger keywords - 'search the wiki', 'find pages about', 'is X documented', 'what does the wiki say about', 'look up in wiki', 'check wiki for'.
 argument-hint: "query=<terms> [vault_path=<absolute path>] [limit=<int, default 10>]"
+user-invocable: false
 ---
 
 # wiki-search

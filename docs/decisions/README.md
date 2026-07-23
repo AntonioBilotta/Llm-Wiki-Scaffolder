@@ -45,3 +45,4 @@ Options rejected, with reasons.
 | [0009](0009-evaluate-user-level-vault-operational-customizations.md) | Evaluate migrating vault operational customizations to user-level | Executed |
 | [0010](0010-eliminate-wiki-detect-vault.md) | Eliminate wiki-detect-vault skill; use auto-loaded copilot-instructions.md as authoritative source for `vault_path` | Accepted |
 | [0011](0011-skill-token-optimization-strategies.md) | Skill token optimization strategies (deferred) | Superseded by ADR-0010 |
+| [0012](0012-orchestration-skills-and-agent-delegation.md) | Convert wiki-{ingest,lint,query} prompts to orchestration skills; agents delegate to skills | Accepted |

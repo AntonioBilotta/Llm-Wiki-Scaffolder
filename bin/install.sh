@@ -119,6 +119,15 @@ INSTALL_PROMPT="$VSCODE_PROMPTS_DIR/new-llm-wiki.prompt.md"
 # Kept here so install and uninstall clean up the old filename on machines that had
 # a previous install (per ADR-0002 Erratum: naming update).
 LEGACY_INSTALL_PROMPT="$VSCODE_PROMPTS_DIR/new_llm_wiki_vault.prompt.md"
+# Legacy wiki-* prompts that were superseded by orchestration skills (2026-07 pilot):
+# wiki-ingest.prompt.md → wiki-ingest skill (skills/wiki-ingest/).
+# wiki-lint.prompt.md   → wiki-lint skill   (skills/wiki-lint/).
+# wiki-query.prompt.md  → wiki-query skill  (skills/wiki-query/).
+LEGACY_WIKI_PROMPTS=(
+    "$VSCODE_PROMPTS_DIR/wiki-ingest.prompt.md"
+    "$VSCODE_PROMPTS_DIR/wiki-lint.prompt.md"
+    "$VSCODE_PROMPTS_DIR/wiki-query.prompt.md"
+)
 
 # Skill destinations (per ADR-0009 Model D, resolved decision Q2 = Option B):
 # copy each wiki-* skill to all three known Copilot skill roots so any host
@@ -208,6 +217,13 @@ if [ "$SKIP_PROMPT" = "false" ]; then
         rm -f -- "$LEGACY_INSTALL_PROMPT"
         echo "  removed legacy prompt: $LEGACY_INSTALL_PROMPT"
     fi
+    # Remove legacy wiki-* prompts superseded by orchestration skills (2026-07).
+    for legacy_prompt in "${LEGACY_WIKI_PROMPTS[@]}"; do
+        if [ -f "$legacy_prompt" ]; then
+            rm -f -- "$legacy_prompt"
+            echo "  removed legacy prompt: $legacy_prompt (superseded by orchestration skill)"
+        fi
+    done
     install -m 0644 "$REPO_ROOT/prompts/new-llm-wiki.prompt.md" "$INSTALL_PROMPT"
     # Wiki-* prompts (ingest, lint, query, ...) — enumerated by glob so future
     # additions are picked up automatically.

@@ -1,8 +1,8 @@
 # llm-wiki-scaffolder
 
-Deterministic scaffolder for **LLM Wiki** vaults following the [Karpathy pattern](templates/karpathy_llm_wiki_pattern.md). Installs user-level GitHub Copilot artifacts — slash-commands (`/new-llm-wiki`, `/wiki-ingest`, `/wiki-lint`, `/wiki-query`) and 9 supporting skills at `~/.copilot/skills/`, `~/.claude/skills/`, and `~/.agents/skills/` — backed by a stdlib-only Python script.
+Deterministic scaffolder for **LLM Wiki** vaults following the [Karpathy pattern](templates/karpathy_llm_wiki_pattern.md). Installs user-level GitHub Copilot artifacts — the `/new-llm-wiki` scaffold prompt and 11 skills at `~/.copilot/skills/`, `~/.claude/skills/`, and `~/.agents/skills/` (3 orchestration skills exposed as `/wiki-ingest`, `/wiki-lint`, `/wiki-query` + 8 hidden atomic primitives they compose) — backed by a stdlib-only Python script.
 
-An LLM Wiki is a persistent, LLM-maintained knowledge base: `raw/` holds immutable sources, `wiki/` holds LLM-owned markdown (entities, concepts, sources, analysis, plus domain-specific folders), and the LLM keeps the wiki up-to-date as new sources are added. Under the Model D architecture ([ADR-0009](docs/decisions/0009-evaluate-user-level-vault-operational-customizations.md)), the four verb rituals (`/wiki-ingest`, `/wiki-lint`, `/wiki-query`, `/new-llm-wiki`) plus the 9 wiki-* skills live at user level and work from any workspace; vault-level agents (`@wiki-reader`, `@wiki-maintainer`, `@wiki-auditor`) are optional per-domain (opt-in for `business` and `personal` domains, opt-out via `--minimal` or opt-in via `--with-agents` for others).
+An LLM Wiki is a persistent, LLM-maintained knowledge base: `raw/` holds immutable sources, `wiki/` holds LLM-owned markdown (entities, concepts, sources, analysis, plus domain-specific folders), and the LLM keeps the wiki up-to-date as new sources are added. Under the Model D architecture ([ADR-0009](docs/decisions/0009-evaluate-user-level-vault-operational-customizations.md)) refined by [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md), the four verb rituals (`/wiki-ingest`, `/wiki-lint`, `/wiki-query` — all orchestration skills — and `/new-llm-wiki` — the scaffold prompt) plus 8 atomic wiki-* skills live at user level and work from any workspace; vault-level agents (`@wiki-reader`, `@wiki-maintainer`, `@wiki-auditor`) are optional per-domain (opt-in for `business` and `personal` domains, opt-out via `--minimal` or opt-in via `--with-agents` for others) and delegate to the orchestration skills.
 
 For the design rationale and the deterministic/LLM boundary, see [ARCHITECTURE.md](ARCHITECTURE.md); individual design decisions are recorded as ADRs under [docs/decisions/](docs/decisions/).
 
@@ -171,19 +171,24 @@ Override defaults with `--raw-folders "a,b,c"` and `--extra-wiki-folders "a,b,c"
 
 ## Working with the vault
 
-Once scaffolded, a vault exposes 4 user-level slash-commands and (optionally) 3 vault-level role agents. Full rationale in [ADR-0005](docs/decisions/0005-prompt-vs-agent-invocation.md) and [ADR-0009](docs/decisions/0009-evaluate-user-level-vault-operational-customizations.md); quick reference:
+Once scaffolded, a vault exposes 4 user-level slash-commands and (optionally) 3 vault-level role agents. Full rationale in [ADR-0005](docs/decisions/0005-prompt-vs-agent-invocation.md), [ADR-0009](docs/decisions/0009-evaluate-user-level-vault-operational-customizations.md), and [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md); quick reference:
 
-| Situation | Tool | Level |
-|---|---|---|
-| Add *this* source to the wiki | `/wiki-ingest <path>` | user (works from any workspace) |
-| Run periodic health check | `/wiki-lint` | user |
-| Ask a one-shot question against the wiki | `/wiki-query "<question>"` | user |
-| Scaffold a new vault | `/new-llm-wiki` | user |
-| Discuss before writing; multi-turn maintenance | `@wiki-maintainer` | vault (if agents included) |
-| Audit only *these* pages / *this* aspect | `@wiki-auditor` | vault (if agents included) |
-| Multi-turn Q&A with role personality | `@wiki-reader` | vault (if agents included) |
+| Situation | Tool | Level | Kind |
+|---|---|---|---|
+| Add *this* source to the wiki | `/wiki-ingest <path>` | user (works from any workspace) | orchestration skill |
+| Run periodic health check | `/wiki-lint` | user | orchestration skill |
+| Ask a one-shot question against the wiki | `/wiki-query "<question>"` | user | orchestration skill |
+| Scaffold a new vault | `/new-llm-wiki` | user | prompt (pre-vault, no vault context to inherit) |
+| Discuss before writing; multi-turn maintenance | `@wiki-maintainer` | vault (if agents included) | delegates to `wiki-ingest` |
+| Audit only *these* pages / *this* aspect | `@wiki-auditor` | vault (if agents included) | delegates to `wiki-lint` |
+| Multi-turn Q&A with role personality | `@wiki-reader` | vault (if agents included) | delegates to `wiki-query` |
 
-**Prompt = verb, agent = subject.** Slash-commands are one-shot rituals with `argument-hint` and log entries (`## [date] ingest \| ...` / `## [date] lint \| ...` / `## [date] query \| ...`). Mentions are role-based conversations for multi-turn or negotiated work — they add vault-specific domain personality on top of the same underlying skills (Variant α composition, per ADR-0009).
+**Three-layer architecture** (per ADR-0012):
+- **Atomic skills** (hidden from `/` picker via `user-invocable: false`): 8 composable primitives — `wiki-search`, `wiki-read-page`, `wiki-summarize-source`, `wiki-write-source-page`, `wiki-write-analysis`, `wiki-update-index`, `wiki-append-log`, `wiki-lint-check`.
+- **Orchestration skills** (visible in `/` picker): `wiki-ingest`, `wiki-lint`, `wiki-query` — each composes the atomic skills into the canonical INGEST / LINT / QUERY workflow.
+- **Agents** (optional, vault-level): 3 role-scoped agents that delegate to the orchestration skills and add domain personality (spoiler-safe reading, PII redaction, ADR format, etc.).
+
+**Prompt = verb, agent = subject.** Slash-commands are one-shot rituals with `argument-hint` and log entries (`## [date] ingest \| ...` / `## [date] lint \| ...` / `## [date] query \| ...`). Mentions are role-based conversations for multi-turn or negotiated work — they add vault-specific domain personality on top of the same underlying skills.
 
 ## Future ideas
 

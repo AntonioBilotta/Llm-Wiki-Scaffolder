@@ -2,7 +2,7 @@
 name: wiki-write-source-page
 description: Create a new page under `wiki/sources/` from a structured summary (typically produced by `wiki-summarize-source`). Writes exactly one file via a bundled Python script for deterministic, atomic behavior. Refuses to overwrite existing source pages. Use as part of an ingest workflow, after `wiki-summarize-source` and before cross-reference updates. Not directly invocable by the user — orchestrated by `/wiki-ingest`.
 argument-hint: "summary=<yaml or json from wiki-summarize-source> [vault_path=<absolute path>]"
-disable-model-invocation: true
+user-invocable: false
 ---
 
 # wiki-write-source-page

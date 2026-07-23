@@ -2,6 +2,7 @@
 name: wiki-summarize-source
 description: Read a source file in a vault's `raw/` directory and produce a structured summary — title, provenance, key points, entities, concepts, and domain items the source touches. Output-only, does NOT write to the wiki. Use as the first step of an ingest workflow, or whenever the user wants to preview what a raw source contains before adding it to the wiki, or when producing a structured breakdown of a document for downstream processing. Trigger keywords - 'summarize this source', 'preview the raw file', 'what is in this document', 'break down this article for the wiki', 'analyze this source before ingesting'.
 argument-hint: "source_path=<path to file under raw/> [vault_path=<absolute path>]"
+user-invocable: false
 ---
 
 # wiki-summarize-source

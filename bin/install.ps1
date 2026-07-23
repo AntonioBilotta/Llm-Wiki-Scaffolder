@@ -121,6 +121,16 @@ $InstallPrompt = Join-Path $VSCodePromptsDir "new-llm-wiki.prompt.md"
 # a previous install (per ADR-0002 Erratum: naming update).
 $LegacyInstallPrompt = Join-Path $VSCodePromptsDir "new_llm_wiki_vault.prompt.md"
 
+# Legacy wiki-* prompts that were superseded by orchestration skills (2026-07 pilot):
+# wiki-ingest.prompt.md → wiki-ingest skill (skills/wiki-ingest/).
+# wiki-lint.prompt.md   → wiki-lint skill   (skills/wiki-lint/).
+# wiki-query.prompt.md  → wiki-query skill  (skills/wiki-query/).
+$LegacyWikiPrompts = @(
+    (Join-Path $VSCodePromptsDir "wiki-ingest.prompt.md"),
+    (Join-Path $VSCodePromptsDir "wiki-lint.prompt.md"),
+    (Join-Path $VSCodePromptsDir "wiki-query.prompt.md")
+)
+
 # Skill destinations (per ADR-0009 Model D, resolved decision Q2 = Option B):
 # copy each wiki-* skill to all three known Copilot skill roots so any host
 # that consumes the Agent Skills open standard can discover them.
@@ -242,6 +252,13 @@ if (-not $NoPrompt) {
     if (Test-Path $LegacyInstallPrompt) {
         Remove-Item -Force $LegacyInstallPrompt
         Write-Host "  removed legacy prompt: $LegacyInstallPrompt"
+    }
+    # Remove legacy wiki-* prompts superseded by orchestration skills (2026-07).
+    foreach ($legacyPrompt in $LegacyWikiPrompts) {
+        if (Test-Path $legacyPrompt) {
+            Remove-Item -Force $legacyPrompt
+            Write-Host "  removed legacy prompt: $legacyPrompt (superseded by orchestration skill)"
+        }
     }
     Copy-Item -Force $PromptSource $InstallPrompt
 

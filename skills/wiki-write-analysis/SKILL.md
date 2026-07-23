@@ -2,7 +2,7 @@
 name: wiki-write-analysis
 description: Archive a substantive analysis, comparison, or derived synthesis as a new page under `wiki/analysis/` (Karpathy pattern - 'good answers can be filed back into the wiki'). Use when the user wants to preserve a wiki-based answer, save an exploration, archive a synthesis for future reference, or when a wiki-reader identifies an answer worth compounding into the knowledge base. Writes exactly one file via a bundled Python script; refuses to overwrite. Trigger keywords - 'archive this analysis', 'save this to the wiki', 'file this answer', 'preserve this synthesis'.
 argument-hint: "title=<string> content=<markdown> related_sources=<list of wiki source page names> [tags=<list>] [vault_path=<absolute path>]"
-disable-model-invocation: true
+user-invocable: false
 ---
 
 # wiki-write-analysis

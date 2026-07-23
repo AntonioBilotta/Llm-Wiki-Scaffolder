@@ -2,7 +2,7 @@
 name: wiki-update-index
 description: Add or update an entry in `wiki/index.md` under a specified section — Entities, Concepts, Sources, Analysis, or any domain-specific section. Writes exactly one file (the index) via a bundled Python script. Use after creating or modifying a wiki page to keep the catalog current. Not directly invocable — orchestrated by ingest, lint, and archive workflows.
 argument-hint: "section=<section name> page=<page name without .md> summary=<one-line description> [vault_path=<absolute path>]"
-disable-model-invocation: true
+user-invocable: false
 ---
 
 # wiki-update-index

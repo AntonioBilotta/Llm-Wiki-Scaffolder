@@ -2,6 +2,7 @@
 name: wiki-lint-check
 description: Run 7 health-check audits on an LLM Wiki vault — contradictions, orphan pages, missing cross-references, stale claims, missing pages, knowledge gaps, and frontmatter integrity. Returns a structured report. Dual output - JSON by default (composable with downstream repair actions), Markdown if `format=md` (human-readable). Read-only; the caller applies repairs. Use for periodic health checks, at the end of batch ingest, or when the user asks 'lint the wiki', 'check wiki health', 'audit the wiki', 'find contradictions in the wiki'.
 argument-hint: "[format=<json|md>] [scope=<vault|pages:comma-separated>] [vault_path=<absolute path>]"
+user-invocable: false
 ---
 
 # wiki-lint-check

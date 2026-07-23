@@ -2,7 +2,7 @@
 name: wiki-append-log
 description: Append a dated entry to `wiki/log.md` recording an ingest, query, lint, batch, or other wiki operation. Writes exactly one file (append-only) via a bundled Python script. Use at the end of every operational workflow to preserve the chronological log per the Karpathy pattern. Standardized format keeps the log greppable with `grep '^## \['`. Not directly invocable — every wiki workflow ends with this.
 argument-hint: "kind=<ingest|query|lint|batch-ingest|other> summary=<one-line description> [touched_pages=<comma-separated wiki page names>] [vault_path=<absolute path>]"
-disable-model-invocation: true
+user-invocable: false
 ---
 
 # wiki-append-log
