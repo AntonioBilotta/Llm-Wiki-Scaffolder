@@ -11,8 +11,6 @@ Return a ranked list of wiki pages relevant to a query, by scanning the vault's 
 
 ## Algorithm
 
-1. **Resolve `vault_path`:**
-   - If `vault_path=<path>` argument was provided, use it.
 1. **Resolve `vault_path`** (required):
    - Use the `vault_path` argument if provided by the caller.
    - Otherwise, refuse and instruct the caller to provide it. The vault path is authoritative in the workspace's `.github/copilot-instructions.md` under the `## Vault / **Path:**` field (see [ADR-0010](https://github.com/AntonioBilotta/Llm-Wiki-Scaffolder/blob/main/docs/decisions/0010-eliminate-wiki-detect-vault.md)).
