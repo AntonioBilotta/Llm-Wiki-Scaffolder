@@ -189,6 +189,116 @@ Rationale detailed in [ADR-0001](docs/decisions/0001-python-stdlib-only.md) and 
 **Why stdlib-only scripts:**
 Same rationale as the scaffolder ([ADR-0001](docs/decisions/0001-python-stdlib-only.md)) — zero runtime dependency, reproducibility, portability.
 
+## Skills call graph and install topology
+
+Detailed view of the 3-layer architecture (per [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md)) — which orchestration skill composes which atomic primitives, which agent delegates to which orchestration skill, and where each artifact is installed on disk.
+
+```mermaid
+flowchart TB
+    subgraph INSTALL["📁 Install locations"]
+        direction TB
+        subgraph USER_INSTALL["User-level (installed once via bin/install.sh)"]
+            direction LR
+            SKILLS3["Skills — 3-way mirror<br/>~/.copilot/skills/<br/>~/.claude/skills/<br/>~/.agents/skills/"]
+            PROMPTS["Prompts (VS Code User)<br/>~/Library/…/Code/User/prompts/<br/>only new-llm-wiki.prompt.md"]
+            SCAFF["Scaffolder<br/>~/.config/llm-wiki/bin/scaffold.py"]
+        end
+        subgraph VAULT_INSTALL["Vault-level (opt-in per domain via --with-agents)"]
+            AGENTS_DIR["&lt;vault&gt;/.github/agents/<br/>wiki-reader.agent.md<br/>wiki-maintainer.agent.md<br/>wiki-auditor.agent.md"]
+        end
+    end
+
+    subgraph L3["🧑‍💼 Layer 3 — Agents (vault-level, opt-in) — domain personality"]
+        direction LR
+        READER["@wiki-reader<br/>tools: no edit → read-only"]
+        MAINT["@wiki-maintainer<br/>tools: read + edit + terminal + agent"]
+        AUD["@wiki-auditor<br/>tools: read + edit (limited scope)"]
+    end
+
+    subgraph L2["🎼 Layer 2 — Orchestration skills (user-level, visible in / picker)"]
+        direction LR
+        WQ["/wiki-query<br/>QUERY workflow"]
+        WI["/wiki-ingest<br/>INGEST workflow"]
+        WL["/wiki-lint<br/>LINT workflow"]
+    end
+
+    subgraph L1["🔧 Layer 1 — Atomic skills (hidden: user-invocable: false in VS Code Chat)"]
+        direction TB
+        subgraph L1R["Read primitives (pure reasoning)"]
+            direction LR
+            WS["wiki-search"]
+            WRP["wiki-read-page"]
+            WSS["wiki-summarize-source"]
+            WLC["wiki-lint-check"]
+        end
+        subgraph L1W["Write primitives (+ Python scripts, single-file atomic writes)"]
+            direction LR
+            WWSP["wiki-write-source-page"]
+            WWA["wiki-write-analysis"]
+            WUI["wiki-update-index"]
+            WAL["wiki-append-log"]
+        end
+    end
+
+    SKILLS3 -.stores.-> L2
+    SKILLS3 -.stores.-> L1
+    AGENTS_DIR -.stores.-> L3
+
+    READER ==>|delegates| WQ
+    MAINT ==>|delegates| WI
+    MAINT -.subagent invoke.-> AUD
+    AUD ==>|delegates| WL
+
+    WQ --> WS
+    WQ --> WRP
+    WQ -.optional archive.-> WWA
+    WQ -.optional archive.-> WUI
+    WQ -.optional archive.-> WAL
+
+    WI --> WSS
+    WI --> WWSP
+    WI --> WRP
+    WI --> WUI
+    WI --> WAL
+    WI -.batch mode.-> WLC
+
+    WL --> WLC
+    WL --> WAL
+
+    classDef agent fill:#dbeafe,stroke:#2563eb,color:#000
+    classDef orch fill:#fef3c7,stroke:#d97706,color:#000
+    classDef atomRead fill:#dcfce7,stroke:#16a34a,color:#000
+    classDef atomWrite fill:#fee2e2,stroke:#dc2626,color:#000
+    classDef install fill:#f3f4f6,stroke:#6b7280,color:#000
+
+    class READER,MAINT,AUD agent
+    class WQ,WI,WL orch
+    class WS,WRP,WSS,WLC atomRead
+    class WWSP,WWA,WUI,WAL atomWrite
+    class SKILLS3,PROMPTS,SCAFF,AGENTS_DIR install
+```
+
+**Legend**
+
+| Arrow | Meaning |
+|---|---|
+| `==>` (thick) | **Delegation** — agent forwards to orchestration skill |
+| `-.subagent invoke.->` | Maintainer invokes auditor as subagent (post batch-ingest) |
+| `-->` | **Composition** — orchestration skill applies atomic skill (always) |
+| `-.optional/batch.->` | Conditional composition (opt-in archive, batch-only lint) |
+| `-.stores.->` | **Install location** — where the file physically lives on disk |
+
+**Composition summary**
+
+- `/wiki-query` → `wiki-search` + `wiki-read-page` (always) + `wiki-write-analysis` + `wiki-update-index` + `wiki-append-log` (opt-in with `--archive`)
+- `/wiki-ingest` → `wiki-summarize-source` + `wiki-write-source-page` + `wiki-read-page` (cross-refs) + `wiki-update-index` + `wiki-append-log` (always) + `wiki-lint-check` (batch mode only)
+- `/wiki-lint` → `wiki-lint-check` (JSON + MD, 2 invocations) + `wiki-append-log`
+
+**Not shown** (kept off the graph for clarity)
+
+- Platform tools (`replace_string_in_file`, `create_file`, `read_file`) used directly by orchestration skills for content edits (cross-refs, frontmatter fixes) — these are not skills.
+- Auto-loaded `.github/instructions/wiki-conventions.instructions.md` (fires on any `wiki/**` or `raw/**` file edit, indirectly applying domain rules regardless of orchestrator).
+
 ### 5. Vault runtime layer — LLM-driven
 
 Once scaffolded, the vault operates with 1 user-level slash-prompt (`/new-llm-wiki`) + 11 user-level skills (3 orchestration + 8 atomic) + (optionally) 3 vault-level role agents that delegate to the orchestration skills. See [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md) for the 3-layer composition rationale.

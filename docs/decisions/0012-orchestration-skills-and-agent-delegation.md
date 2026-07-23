@@ -60,6 +60,97 @@ Layer 1 — Atomic skills (user-level, hidden from / menu)
 
 5. **Install-time cleanup**: `install.sh` and `install.ps1` add a `LEGACY_WIKI_PROMPTS` array containing `wiki-{ingest,lint,query}.prompt.md`; on install, these files are removed from `VS Code User/prompts/` if present from a previous version.
 
+### Visual reference
+
+```mermaid
+flowchart TB
+    subgraph INSTALL["📁 Install locations"]
+        direction TB
+        subgraph USER_INSTALL["User-level (installed once via bin/install.sh)"]
+            direction LR
+            SKILLS3["Skills — 3-way mirror<br/>~/.copilot/skills/<br/>~/.claude/skills/<br/>~/.agents/skills/"]
+            PROMPTS["Prompts (VS Code User)<br/>~/Library/…/Code/User/prompts/<br/>only new-llm-wiki.prompt.md"]
+        end
+        subgraph VAULT_INSTALL["Vault-level (opt-in per domain via --with-agents)"]
+            AGENTS_DIR["&lt;vault&gt;/.github/agents/<br/>wiki-{reader,maintainer,auditor}.agent.md"]
+        end
+    end
+
+    subgraph L3["🧑‍💼 Layer 3 — Agents (vault-level, opt-in)"]
+        direction LR
+        READER["@wiki-reader<br/>read-only"]
+        MAINT["@wiki-maintainer<br/>read + edit + subagent"]
+        AUD["@wiki-auditor<br/>read + edit (limited)"]
+    end
+
+    subgraph L2["🎼 Layer 2 — Orchestration skills (user-level, visible)"]
+        direction LR
+        WQ["/wiki-query"]
+        WI["/wiki-ingest"]
+        WL["/wiki-lint"]
+    end
+
+    subgraph L1["🔧 Layer 1 — Atomic skills (user-invocable: false)"]
+        direction TB
+        subgraph L1R["Read primitives"]
+            direction LR
+            WS["wiki-search"]
+            WRP["wiki-read-page"]
+            WSS["wiki-summarize-source"]
+            WLC["wiki-lint-check"]
+        end
+        subgraph L1W["Write primitives (+ Python scripts)"]
+            direction LR
+            WWSP["wiki-write-source-page"]
+            WWA["wiki-write-analysis"]
+            WUI["wiki-update-index"]
+            WAL["wiki-append-log"]
+        end
+    end
+
+    SKILLS3 -.stores.-> L2
+    SKILLS3 -.stores.-> L1
+    AGENTS_DIR -.stores.-> L3
+
+    READER ==>|delegates| WQ
+    MAINT ==>|delegates| WI
+    MAINT -.subagent invoke.-> AUD
+    AUD ==>|delegates| WL
+
+    WQ --> WS
+    WQ --> WRP
+    WQ -.optional archive.-> WWA
+    WQ -.optional archive.-> WUI
+    WQ -.optional archive.-> WAL
+
+    WI --> WSS
+    WI --> WWSP
+    WI --> WRP
+    WI --> WUI
+    WI --> WAL
+    WI -.batch mode.-> WLC
+
+    WL --> WLC
+    WL --> WAL
+
+    classDef agent fill:#dbeafe,stroke:#2563eb,color:#000
+    classDef orch fill:#fef3c7,stroke:#d97706,color:#000
+    classDef atomRead fill:#dcfce7,stroke:#16a34a,color:#000
+    classDef atomWrite fill:#fee2e2,stroke:#dc2626,color:#000
+    classDef install fill:#f3f4f6,stroke:#6b7280,color:#000
+
+    class READER,MAINT,AUD agent
+    class WQ,WI,WL orch
+    class WS,WRP,WSS,WLC atomRead
+    class WWSP,WWA,WUI,WAL atomWrite
+    class SKILLS3,PROMPTS,AGENTS_DIR install
+```
+
+Composition summary:
+- `/wiki-query` → wiki-search + wiki-read-page (always) + wiki-write-analysis + wiki-update-index + wiki-append-log (opt-in with `--archive`)
+- `/wiki-ingest` → wiki-summarize-source + wiki-write-source-page + wiki-read-page (cross-refs) + wiki-update-index + wiki-append-log (always) + wiki-lint-check (batch mode only)
+- `/wiki-lint` → wiki-lint-check (JSON + MD) + wiki-append-log
+
 ## Consequences
 
 **Positive:**
