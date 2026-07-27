@@ -14,17 +14,29 @@ Exit code 0 always. Success/failure is reported in the JSON on stdout.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
+import unicodedata
 from datetime import date
 from pathlib import Path
 
 
 def slugify(text: str) -> str:
-    """Lowercase, non-alphanumeric to underscore, collapse runs, strip edges."""
-    s = re.sub(r"[^a-z0-9]+", "_", text.lower())
-    return s.strip("_")
+    """Lowercase snake_case slug, Unicode-safe.
+
+    See write_source_page.py for the full rationale. Kept in sync so both
+    skills produce identical slugs for the same title.
+    """
+    normalized = unicodedata.normalize("NFKD", text)
+    stripped = "".join(c for c in normalized if not unicodedata.combining(c))
+    s = re.sub(r"[^a-z0-9]+", "_", stripped.lower()).strip("_")
+    if s:
+        return s
+    if text.strip():
+        return "page_" + hashlib.md5(text.encode("utf-8")).hexdigest()[:8]
+    return ""
 
 
 def parse_list_arg(raw: str) -> list[str]:
@@ -89,7 +101,11 @@ def main() -> None:
     tags = parse_list_arg(args.tags)
     today = date.today().isoformat()
 
-    related_yaml = "[" + ", ".join(f"[[{name}]]" for name in related) + "]"
+    # Bare page names (no `[[...]]` wrapping) — see wiki-conventions.
+    # This is what wiki-lint-check and wiki-read-page expect: a YAML list of
+    # strings, each a page name under wiki/sources/. `[[wikilink]]` syntax
+    # belongs to the body, not to YAML values.
+    related_yaml = "[" + ", ".join(related) + "]"
     tags_yaml = "[" + ", ".join(tags) + "]"
 
     lines: list[str] = [

@@ -23,6 +23,7 @@ Ingest a source (single file or folder) from `raw/` into the LLM Wiki following 
 
 1. Apply `wiki-summarize-source` with `vault_path=<from preflight>` and `source_path=<from args>` (relative to the vault root; the skill resolves it under `<vault_path>/raw/`).
 2. Briefly discuss the summary with the user: which entities/concepts to emphasize, whether to skip anything. Skip discussion only if the user has already given explicit direction.
+   - **If `summary.duplicate_of` is set**, the summarizer flagged the source as a near-duplicate of an existing page. Present the existing page name and the overlap detail to the user and ask whether to: (a) skip ingest, (b) proceed anyway creating a distinct page, or (c) merge the new information into the existing page via file-edit tools instead of running `wiki-write-source-page`. Do not proceed silently.
 3. Apply `wiki-write-source-page` with `vault_path=<...>` and the summary from step 1. It creates `wiki/sources/<slug>.md` and refuses to overwrite an existing source page.
 4. For each entity/concept/domain item listed by the summary, apply `wiki-read-page` with `vault_path=<...>` and `page=<name>` to check whether the corresponding page already exists.
    - **Exists**: update the page with the new information the source contributes — cite the new source via `[[wikilink]]`, bump `update_date` to today, flag any contradiction with a `> [!warning] Contradiction: <detail>` callout. Use file-edit tools for content changes (no atomic skill exists for generic page content editing — this is per-vault content work).

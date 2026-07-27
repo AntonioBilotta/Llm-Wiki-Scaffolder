@@ -40,7 +40,7 @@ Parse stdout as JSON. The script (stdlib only) writes the file with standard fro
    type: analysis
    creation_date: <today YYYY-MM-DD>
    update_date: <today YYYY-MM-DD>
-   related_sources: [[[source_a]], [[source_b]], ...]
+   related_sources: [source_a, source_b, ...]
    tags: [<list from argument>]
    ---
 
@@ -48,6 +48,8 @@ Parse stdout as JSON. The script (stdlib only) writes the file with standard fro
 
    <content, verbatim from argument>
    ```
+
+   Note: `related_sources` contains **bare page names** (no `[[...]]` wrapping). Wikilink syntax is for the body only; YAML values are plain strings so parsers can read them uniformly.
 
 4. **Write** the file.
 
