@@ -1,11 +1,32 @@
 # ADR-0009: Evaluate migrating vault operational customizations to user-level
 
 ## Status
-Proposed (2026-07)
+Executed (2026-07) — Phase A/B/C/C+/C++/C+++ shipped, validated end-to-end via `/wiki-ingest` on the dev-second-brain pilot vault.
+
+## Erratum (2026-07, post-pilot correction)
+
+The original text of this ADR (below) repeatedly claimed that agents provide **"platform-enforced tool restriction"** by listing user-level skills in their `tools:` frontmatter (e.g. reader's `tools:` excluding `wiki-write-source-page`). This claim is **incorrect**.
+
+VS Code Copilot's `tools:` frontmatter is an allowlist of **toolset names** (`codebase`, `search`, `editFiles`, `runCommands`, `agent`, …) or namespaced tool IDs (`search/codebase`, `edit/editFiles`, `execute/runInTerminal`, `read/terminalLastCommand`, …). It does NOT accept skill names. Skills are a different mechanism — `SKILL.md` files auto-loaded as instructions when their `description` matches the current task semantically; they are playbooks, not endpoints.
+
+Consequence: our Phase C agent templates (and the initially deployed vault agents) listed skill names in `tools:`, which VS Code silently dropped, effectively leaving the agents **unrestricted** — the opposite of the intent. An intermediate Phase C++ fix using individual tool IDs (`read_file`, `create_file`, `run_in_terminal`) partially worked in VS Code Agent Mode but failed in Copilot CLI where several IDs were silently dropped.
+
+**Final correction (Phase C+++, validated end-to-end via `/wiki-ingest` pilot):**
+
+- Agent templates now use canonical toolset names in the **namespaced form** (`category/name`), consistently across all 3 agents:
+  - **reader**: `tools: ['search/codebase', 'search', 'execute/getTerminalOutput', 'execute/runInTerminal', 'read/terminalLastCommand', 'read/terminalSelection']` — deliberately no `edit/editFiles` → runtime-enforced read-only for wiki content; archival writes go through skill Python scripts via the terminal toolsets.
+  - **maintainer**: `tools: ['search/codebase', 'search', 'edit/editFiles', 'execute/getTerminalOutput', 'execute/runInTerminal', 'read/terminalLastCommand', 'read/terminalSelection', 'agent']` + `agents: [wiki-auditor]` — `agent` toolset in `tools:` is REQUIRED (per docs) for subagent dispatch, in addition to the top-level `agents:` field.
+  - **auditor**: `tools: ['search/codebase', 'search', 'edit/editFiles', 'execute/getTerminalOutput', 'execute/runInTerminal', 'read/terminalLastCommand', 'read/terminalSelection']` — has `edit/editFiles` for callouts + frontmatter auto-repair; "no create new pages" restriction stays prompt-body only (toolset granularity cannot express "edit but not create").
+- Both short form (`'codebase', 'editFiles', 'runCommands'`) and namespaced form (`'search/codebase', 'edit/editFiles', 'execute/runInTerminal'`) are accepted by VS Code Agent Mode. We chose the namespaced form uniformly for clarity (explicit category prefix) and to sidestep a deprecation warning observed on the short form in some VS Code builds.
+- Skills are referenced in agent bodies via "apply the `X` skill" wording — not "invoke `X`" — to reflect the playbook semantics.
+- **Runtime caveat**: `/wiki-*` prompts (having no `tools:` field of their own) inherit the current chat mode's toolset. Running `/wiki-ingest` in **Ask Mode** or **Copilot CLI without proper permissions** = no write tools regardless of what `@wiki-maintainer`'s frontmatter says. INGEST/LINT workflows require **Agent Mode**.
+- **UX trade-off observed in pilot**: user-level skill Python scripts (under `~/.agents/skills/*/scripts/`) trigger Copilot CLI permission prompts each invocation (path-outside-workspace + terminal command + create-file in new subdirs). Once "always allow" is granted per pattern the friction disappears, but first-run UX is noisy. This is the cost of the composability + blast-radius safety this ADR chose.
+
+The **conclusion of ADR-0009 stands**: Model D + Variant α remains the chosen architecture. Only the enforcement mechanism claim needed correction. Toolset-name allowlisting gives us the runtime-enforced read-only vs write distinction that Model D depends on.
 
 ## Context
 
-Today, when `/new_llm_wiki_vault` scaffolds a new vault, it materializes the full set of operational customization files inside the vault's `.github/` directory:
+Today, when `/new-llm-wiki` scaffolds a new vault, it materializes the full set of operational customization files inside the vault's `.github/` directory:
 
 ```
 <vault>/.github/

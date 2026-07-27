@@ -17,7 +17,10 @@
     Target VS Code Insiders instead of stable.
 
 .PARAMETER NoPrompt
-    Skip copying the VS Code user prompt.
+    Skip copying the VS Code user prompts (scaffold + wiki-*).
+
+.PARAMETER NoSkills
+    Skip installing user-level wiki-* skills.
 
 .EXAMPLE
     .\bin\install.ps1
@@ -36,7 +39,8 @@
 param(
     [switch]$Uninstall,
     [switch]$Insiders,
-    [switch]$NoPrompt
+    [switch]$NoPrompt,
+    [switch]$NoSkills
 )
 
 Set-StrictMode -Version Latest
@@ -55,7 +59,7 @@ if (-not (Test-Path $ScaffoldPy)) {
     exit 1
 }
 
-$PromptSource = Join-Path $RepoRoot "prompts\new_llm_wiki_vault.prompt.md"
+$PromptSource = Join-Path $RepoRoot "prompts\new-llm-wiki.prompt.md"
 if (-not (Test-Path $PromptSource)) {
     Write-Error "Missing prompt file at $PromptSource"
     exit 1
@@ -111,7 +115,30 @@ $InstallRoot = Join-Path $env:APPDATA "llm-wiki"
 $InstallBin = Join-Path $InstallRoot "bin"
 $InstallTemplates = Join-Path $InstallRoot "templates"
 $InstallScaffold = Join-Path $InstallBin "scaffold.py"
-$InstallPrompt = Join-Path $VSCodePromptsDir "new_llm_wiki_vault.prompt.md"
+$InstallPrompt = Join-Path $VSCodePromptsDir "new-llm-wiki.prompt.md"
+# Legacy: prior versions installed the scaffold prompt as new_llm_wiki_vault.prompt.md.
+# Kept here so install and uninstall clean up the old filename on machines that had
+# a previous install (per ADR-0002 Erratum: naming update).
+$LegacyInstallPrompt = Join-Path $VSCodePromptsDir "new_llm_wiki_vault.prompt.md"
+
+# Legacy wiki-* prompts that were superseded by orchestration skills (2026-07 pilot):
+# wiki-ingest.prompt.md → wiki-ingest skill (skills/wiki-ingest/).
+# wiki-lint.prompt.md   → wiki-lint skill   (skills/wiki-lint/).
+# wiki-query.prompt.md  → wiki-query skill  (skills/wiki-query/).
+$LegacyWikiPrompts = @(
+    (Join-Path $VSCodePromptsDir "wiki-ingest.prompt.md"),
+    (Join-Path $VSCodePromptsDir "wiki-lint.prompt.md"),
+    (Join-Path $VSCodePromptsDir "wiki-query.prompt.md")
+)
+
+# Skill destinations (per ADR-0009 Model D, resolved decision Q2 = Option B):
+# copy each wiki-* skill to all three known Copilot skill roots so any host
+# that consumes the Agent Skills open standard can discover them.
+$SkillRoots = @(
+    (Join-Path $env:USERPROFILE ".copilot\skills"),
+    (Join-Path $env:USERPROFILE ".claude\skills"),
+    (Join-Path $env:USERPROFILE ".agents\skills")
+)
 
 # ---------------------------------------------------------------------------
 # Uninstall
@@ -121,11 +148,33 @@ if ($Uninstall) {
     Write-Host "Uninstalling llm-wiki-scaffolder..."
     $removed = 0
 
-    foreach ($target in @($InstallScaffold, $InstallPrompt)) {
+    foreach ($target in @($InstallScaffold, $InstallPrompt, $LegacyInstallPrompt)) {
         if (Test-Path $target) {
             Remove-Item -Force $target
             Write-Host "  removed: $target"
             $removed++
+        }
+    }
+
+    # Wiki-* prompts (ingest, lint, query, ...).
+    if (Test-Path $VSCodePromptsDir) {
+        Get-ChildItem -Path $VSCodePromptsDir -Filter "wiki-*.prompt.md" -File -ErrorAction SilentlyContinue |
+            ForEach-Object {
+                Remove-Item -Force $_.FullName
+                Write-Host "  removed: $($_.FullName)"
+                $removed++
+            }
+    }
+
+    # Wiki-* skills across all three destinations.
+    foreach ($root in $SkillRoots) {
+        if (Test-Path $root) {
+            Get-ChildItem -Path $root -Filter "wiki-*" -Directory -ErrorAction SilentlyContinue |
+                ForEach-Object {
+                    Remove-Item -Recurse -Force $_.FullName
+                    Write-Host "  removed: $($_.FullName)\"
+                    $removed++
+                }
         }
     }
 
@@ -158,7 +207,10 @@ Write-Host "Installing llm-wiki-scaffolder from $RepoRoot"
 Write-Host "  scaffold:  $InstallScaffold"
 Write-Host "  templates: $InstallTemplates\"
 if (-not $NoPrompt) {
-    Write-Host "  prompt:    $InstallPrompt"
+    Write-Host "  prompts:   $VSCodePromptsDir\{new-llm-wiki,wiki-*}.prompt.md"
+}
+if (-not $NoSkills) {
+    Write-Host "  skills:    %USERPROFILE%\.copilot\skills\wiki-*\  (and .claude, .agents mirrors)"
 }
 Write-Host ""
 
@@ -192,11 +244,62 @@ Get-ChildItem $TemplatesSource -Recurse |
 # Script: copy scaffold.py
 Copy-Item -Force $ScaffoldPy $InstallScaffold
 
-# Prompt: copy to VS Code user prompts folder
+# Prompts: copy to VS Code user prompts folder (scaffold + wiki-* verbs)
 # ($PromptSource existence was validated at prerequisites time.)
 if (-not $NoPrompt) {
     New-Item -ItemType Directory -Force -Path $VSCodePromptsDir | Out-Null
+    # Remove legacy prompt file if present (renamed 2026-07 per ADR-0002 Erratum).
+    if (Test-Path $LegacyInstallPrompt) {
+        Remove-Item -Force $LegacyInstallPrompt
+        Write-Host "  removed legacy prompt: $LegacyInstallPrompt"
+    }
+    # Remove legacy wiki-* prompts superseded by orchestration skills (2026-07).
+    foreach ($legacyPrompt in $LegacyWikiPrompts) {
+        if (Test-Path $legacyPrompt) {
+            Remove-Item -Force $legacyPrompt
+            Write-Host "  removed legacy prompt: $legacyPrompt (superseded by orchestration skill)"
+        }
+    }
     Copy-Item -Force $PromptSource $InstallPrompt
+
+    # Wiki-* prompts (ingest, lint, query, ...) — enumerated by glob so future
+    # additions are picked up automatically.
+    $PromptsDir = Join-Path $RepoRoot "prompts"
+    Get-ChildItem -Path $PromptsDir -Filter "wiki-*.prompt.md" -File | ForEach-Object {
+        $dest = Join-Path $VSCodePromptsDir $_.Name
+        Copy-Item -Force $_.FullName $dest
+        Write-Host "  installed prompt: $dest"
+    }
+}
+
+# Skills: copy each wiki-* skill directory to all three known Copilot skill
+# roots for maximum portability (VS Code, Copilot CLI, Claude Code, etc.).
+if (-not $NoSkills) {
+    $SkillsSource = Join-Path $RepoRoot "skills"
+    if (-not (Test-Path $SkillsSource)) {
+        Write-Error "Missing skills/ directory at $SkillsSource"
+        exit 1
+    }
+    foreach ($root in $SkillRoots) {
+        New-Item -ItemType Directory -Force -Path $root | Out-Null
+        # Remove legacy skill wiki-detect-vault if present (eliminated 2026-07
+        # per ADR-0010: vault path is authoritative in the workspace's
+        # .github/copilot-instructions.md, no detection skill needed).
+        $LegacyDetect = Join-Path $root "wiki-detect-vault"
+        if (Test-Path $LegacyDetect) {
+            Remove-Item -Recurse -Force $LegacyDetect
+            Write-Host "  removed legacy skill: $LegacyDetect\"
+        }
+        Get-ChildItem -Path $SkillsSource -Filter "wiki-*" -Directory | ForEach-Object {
+            $dest = Join-Path $root $_.Name
+            # Remove existing to ensure clean state (equivalent to rsync --delete)
+            if (Test-Path $dest) {
+                Remove-Item -Recurse -Force $dest
+            }
+            Copy-Item -Recurse -Force $_.FullName $dest
+            Write-Host "  installed skill: $dest\"
+        }
+    }
 }
 
 # ---------------------------------------------------------------------------
@@ -226,7 +329,7 @@ Write-Host "Installation complete!" -ForegroundColor Green
 Write-Host ""
 Write-Host "Next steps:" -ForegroundColor Cyan
 Write-Host "  1. Reload VS Code window (Ctrl+Shift+P -> Developer: Reload Window)"
-Write-Host "  2. In Copilot Chat, type: /new_llm_wiki_vault"
+Write-Host "  2. In Copilot Chat, type: /new-llm-wiki"
 Write-Host ""
 Write-Host "Installed paths:"
 Write-Host "  $InstallRoot\"
