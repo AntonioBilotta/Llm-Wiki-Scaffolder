@@ -1,7 +1,7 @@
 ---
 name: wiki-append-log
 description: Append a dated entry to `wiki/log.md` recording an ingest, query, lint, batch, or other wiki operation. Writes exactly one file (append-only) via a bundled Python script. Use at the end of every operational workflow to preserve the chronological log per the Karpathy pattern. Standardized format keeps the log greppable with `grep '^## \['`. Not directly invocable — every wiki workflow ends with this.
-argument-hint: "kind=<ingest|query|lint|batch-ingest|other> summary=<one-line description> [touched_pages=<comma-separated wiki page names>] [vault_path=<absolute path>]"
+argument-hint: "kind=<ingest|query|lint|batch-ingest|init|other> summary=<one-line description> [touched_pages=<comma-separated wiki page names>] [vault_path=<absolute path>]"
 user-invocable: false
 ---
 
@@ -61,6 +61,7 @@ line_prefix: "## [<date>] <kind> | ..."
 ## Gotchas
 
 - `--kind` is validated as `^[a-z][a-z0-9-]*$`. Spaces, uppercase, and punctuation are rejected — use `batch-ingest`, not `batch ingest` or `Batch Ingest`.
+- Standard kinds: `ingest` (single-source), `batch-ingest` (folder), `query` (wiki-query archival), `lint` (wiki-lint report), `init` (reserved for the scaffolder's first entry — do not emit from workflows), `other` (fallback for one-offs).
 - `--touched-pages` receives bare page names (no `.md`, no `[[]]` wrapping). The script wraps them. Passing `[[foo_bar]]` produces `[[[[foo_bar]]]]` in the log.
 - The script always exits 0. Check the `appended` field for the outcome.
 - If `wiki/log.md` does not exist, the script creates it with a `# Log` heading. Subsequent invocations preserve it.

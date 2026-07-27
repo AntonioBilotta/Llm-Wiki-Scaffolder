@@ -14,17 +14,34 @@ Exit code 0 always. Success/failure is reported in the JSON on stdout.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import re
 import sys
+import unicodedata
 from datetime import date
 from pathlib import Path
 
 
 def slugify(text: str) -> str:
-    """Lowercase, non-alphanumeric to underscore, collapse runs, strip edges."""
-    s = re.sub(r"[^a-z0-9]+", "_", text.lower())
-    return s.strip("_")
+    """Lowercase snake_case slug, Unicode-safe.
+
+    Strategy:
+    1. NFKD-normalize and strip combining marks (accents → base letter,
+       so "Perché" → "perche", "café" → "cafe").
+    2. Collapse runs of non-[a-z0-9] to `_` and strip edges.
+    3. If the result is empty (e.g. title was all non-latin — CJK, Arabic,
+       Cyrillic …), fall back to an 8-char MD5 hex prefix of the original
+       text so we still produce a stable, unique slug.
+    """
+    normalized = unicodedata.normalize("NFKD", text)
+    stripped = "".join(c for c in normalized if not unicodedata.combining(c))
+    s = re.sub(r"[^a-z0-9]+", "_", stripped.lower()).strip("_")
+    if s:
+        return s
+    if text.strip():
+        return "page_" + hashlib.md5(text.encode("utf-8")).hexdigest()[:8]
+    return ""
 
 
 def build_page(summary: dict, today: str) -> str:
@@ -76,11 +93,19 @@ def build_page(summary: dict, today: str) -> str:
     for section_name, key in (("Entities", "entities"), ("Concepts", "concepts")):
         items = summary.get(key) or []
         if items:
-            lines.append(f"## {section_name}")
-            lines.append("")
+            seen: set[str] = set()
+            slugs: list[str] = []
             for item in items:
-                lines.append(f"- [[{slugify(item)}]]")
-            lines.append("")
+                slug = slugify(item)
+                if slug and slug not in seen:
+                    seen.add(slug)
+                    slugs.append(slug)
+            if slugs:
+                lines.append(f"## {section_name}")
+                lines.append("")
+                for slug in slugs:
+                    lines.append(f"- [[{slug}]]")
+                lines.append("")
 
     domain_items = summary.get("domain_items") or {}
     for dtype, items in domain_items.items():
@@ -88,12 +113,20 @@ def build_page(summary: dict, today: str) -> str:
         if dtype in ("entities", "concepts"):
             continue
         if items:
-            heading = dtype.replace("_", " ").title()
-            lines.append(f"## {heading}")
-            lines.append("")
+            seen = set()
+            slugs = []
             for item in items:
-                lines.append(f"- [[{slugify(item)}]]")
-            lines.append("")
+                slug = slugify(item)
+                if slug and slug not in seen:
+                    seen.add(slug)
+                    slugs.append(slug)
+            if slugs:
+                heading = dtype.replace("_", " ").title()
+                lines.append(f"## {heading}")
+                lines.append("")
+                for slug in slugs:
+                    lines.append(f"- [[{slug}]]")
+                lines.append("")
 
     return "\n".join(lines).rstrip() + "\n"
 
