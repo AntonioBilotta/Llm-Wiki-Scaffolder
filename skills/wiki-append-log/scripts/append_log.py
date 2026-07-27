@@ -29,7 +29,8 @@ def main() -> None:
     parser.add_argument(
         "--kind",
         required=True,
-        help="Single word: ingest | query | lint | batch-ingest | init | other.",
+        help="Single word: ingest | query | lint | batch-ingest | other. "
+             "('init' is reserved for the scaffolder and rejected here.)",
     )
     parser.add_argument("--summary", required=True, help="One-line description of the operation.")
     parser.add_argument(

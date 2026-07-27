@@ -145,6 +145,11 @@ def main() -> None:
     #   - `2026-01-01` (ISO date) becomes a datetime.date, not a str
     # Quoting via json.dumps sidesteps all three. ensure_ascii=False preserves
     # unicode readability (accents, emoji) instead of escaping to \uXXXX.
+    #
+    # NOTE: this expression is intentionally kept identical to
+    # write_source_page.py::_yaml_flow_list. Two-source drift would produce
+    # inconsistent YAML across the vault. If you change the emission format
+    # here, mirror the change in write_source_page.py and vice versa.
     related_yaml = "[" + ", ".join(json.dumps(x, ensure_ascii=False) for x in related) + "]"
     tags_yaml = "[" + ", ".join(json.dumps(x, ensure_ascii=False) for x in tags) + "]"
 

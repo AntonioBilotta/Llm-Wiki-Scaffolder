@@ -128,11 +128,30 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
 
     Returns (body, warnings). `warnings` collects non-fatal issues (e.g. an
     unparseable `source_date` that was dropped from frontmatter but kept
-    verbatim in the body's Date line for human readability).
+    verbatim in the body's Date line for human readability, or a summary
+    field with the wrong Python type that was coerced to a safe default).
     """
     warnings: list[str] = []
     title = summary["title"]
-    prov = summary.get("provenance") or {}
+
+    # Defensive type coercion: the summary is caller-generated (often by an
+    # LLM), so a schema slip is plausible. Without these guards, a string
+    # accidentally passed where a list is expected would iterate character-
+    # by-character and emit `[[f]] [[r]] [[o]] [[d]] [[o]]`. Coerce silently
+    # to a safe empty default and surface a warning in the return JSON so
+    # the orchestrator can see the drift instead of receiving corrupt output.
+    for key in ("key_points", "entities", "concepts"):
+        v = summary.get(key)
+        if v is not None and not isinstance(v, list):
+            warnings.append(f"{key}_not_list: expected array, got {type(v).__name__}")
+            summary[key] = []
+
+    prov = summary.get("provenance")
+    if prov is not None and not isinstance(prov, dict):
+        warnings.append(f"provenance_not_dict: expected object, got {type(prov).__name__}")
+        prov = {}
+    elif prov is None:
+        prov = {}
     raw_path = prov.get("raw_path", "")
     original_url = prov.get("original_url")
     raw_source_date = summary.get("date")
@@ -222,9 +241,15 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
                 lines.append("")
 
     domain_items = summary.get("domain_items") or {}
+    if not isinstance(domain_items, dict):
+        warnings.append(f"domain_items_not_dict: expected object, got {type(domain_items).__name__}")
+        domain_items = {}
     for dtype, items in domain_items.items():
         # Skip keys that would duplicate the hardcoded sections above.
         if dtype in ("entities", "concepts"):
+            continue
+        if not isinstance(items, list):
+            warnings.append(f"domain_items.{dtype}_not_list: expected array, got {type(items).__name__}")
             continue
         if items:
             seen = set()

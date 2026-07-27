@@ -130,8 +130,13 @@ def main() -> None:
         # Seed the four canonical sections (matching bin/scaffold.py:render_index)
         # so the auto-created index converges to the same shape as a fresh scaffold
         # regardless of the order of first inserts. Extra domain sections (e.g.
-        # `## Open Questions`, `## Decisions`) are appended by the section-not-found
-        # branch below on demand.
+        # `## Open Questions`, `## Decisions`) are inserted by the section-not-found
+        # branch below on demand (before `## Sources`, matching scaffolder order).
+        #
+        # H1 title is `# Wiki Index` (scaffolder uses `# Wiki Index — <project>`;
+        # the project name is not available here since --vault-path is the only
+        # location signal). Autocreate should be rare in practice — the scaffolder
+        # always emits index.md — this branch exists only as defensive fallback.
         placeholder = "- _(no entries yet)_"
         idx_path.write_text(
             "---\n"
@@ -139,7 +144,7 @@ def main() -> None:
             f"update_date: {today}\n"
             "---\n"
             "\n"
-            "# Index\n"
+            "# Wiki Index\n"
             "\n"
             "## Entities\n"
             "\n"
@@ -177,7 +182,7 @@ def main() -> None:
     start, end = find_section_bounds(lines, args.section)
 
     if start is None:
-        # Section does not exist — append it at the end.
+        # Section does not exist — create it.
         # For the four standard sections, force canonical Title Case so we
         # never emit `## entities` when the vault already conventionally uses
         # `## Entities`. For non-standard sections (e.g. `open_questions`,
@@ -191,11 +196,42 @@ def main() -> None:
             section_heading = canonical
         else:
             section_heading = _normalize(args.section).title()
-        if lines and lines[-1] != "":
+
+        # For NON-standard sections, insert immediately before `## Sources`
+        # if it exists — this matches bin/scaffold.py:render_index, where extra
+        # domain sections (findings, open_questions, decisions, characters …)
+        # sit BETWEEN Concepts and Sources, not after Analysis. Without this,
+        # a scaffolded vault with an extra section added later would drift
+        # from a fresh-scaffold layout. Standard sections (or a hand-crafted
+        # index without `## Sources`) fall back to appending at end.
+        is_non_standard = canonical is None
+        sources_idx: int | None = None
+        if is_non_standard:
+            for i, line in enumerate(lines):
+                if line.strip() == "## Sources":
+                    sources_idx = i
+                    break
+
+        if sources_idx is not None:
+            # Splice `## <section>` + blank + entry before `## Sources`, keeping
+            # the pre-existing blank line that separates `## Sources` from what
+            # came before. Rewinding past that blank line and then re-emitting a
+            # trailing blank in the block would stack two blanks; instead we
+            # rewind, add one LEADING blank to separate from the previous
+            # section's last entry, and reuse the existing blank as the trailing
+            # separator to `## Sources`. Net: exactly one blank line on each
+            # side of the new section, matching scaffolder output.
+            insert_at = sources_idx
+            while insert_at > 0 and lines[insert_at - 1] == "":
+                insert_at -= 1
+            new_block = ["", f"## {section_heading}", "", new_entry]
+            lines[insert_at:insert_at] = new_block
+        else:
+            if lines and lines[-1] != "":
+                lines.append("")
+            lines.append(f"## {section_heading}")
             lines.append("")
-        lines.append(f"## {section_heading}")
-        lines.append("")
-        lines.append(new_entry)
+            lines.append(new_entry)
         action = "inserted"
         section_name_written = section_heading
     else:

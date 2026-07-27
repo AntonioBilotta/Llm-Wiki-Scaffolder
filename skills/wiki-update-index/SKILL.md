@@ -33,7 +33,9 @@ Parse stdout as JSON. If the target section does not exist, the script appends i
    - Match `## <section>` case-insensitively.
    - Standard sections: `Entities`, `Concepts`, `Sources`, `Analysis`, plus any domain-specific sections the vault has configured.
 
-4. **If the section does not exist**, create it by appending `## <section>` at the end of the file.
+4. **If the section does not exist**, create it:
+   - **Standard sections** (`Entities`, `Concepts`, `Sources`, `Analysis`): append at the end of the file in canonical Title Case.
+   - **Non-standard sections** (e.g. `open_questions`, `findings`, `decisions`, `characters`): if `## Sources` exists, insert the new section immediately before it — matching the scaffolder's `render_index` order (extras between Concepts and Sources, then Sources and Analysis). If `## Sources` is absent (hand-crafted index), fall back to appending at the end.
 
 5. **Drop the `_(no entries yet)_` placeholder** if present inside the section (added by the scaffolder to keep empty sections visually meaningful).
 
@@ -71,8 +73,8 @@ Or `updated: false, reason: <string>` on failure.
 
 ## Gotchas
 
-- Section matching is case-insensitive AND treats `_` and whitespace as equivalent, so `--section open_questions` matches a scaffolded `## Open Questions` heading (no duplicate section is created). When the section does not yet exist and needs to be created: for the four standard sections (`Entities`, `Concepts`, `Sources`, `Analysis`) the heading is written in canonical Title Case; for non-standard sections the same Title Case transformation used by the scaffolder (`folder.replace("_", " ").title()`) is applied, so `--section open_questions` creates `## Open Questions` — matching what a fresh scaffold would emit.
+- Section matching is case-insensitive AND treats `_` and whitespace as equivalent, so `--section open_questions` matches a scaffolded `## Open Questions` heading (no duplicate section is created). When the section does not yet exist and needs to be created: for the four standard sections (`Entities`, `Concepts`, `Sources`, `Analysis`) the heading is written in canonical Title Case and appended at end; for non-standard sections the same Title Case transformation used by the scaffolder (`folder.replace("_", " ").title()`) is applied AND the section is inserted before `## Sources` (if present), so `--section open_questions` creates `## Open Questions` between Concepts and Sources — matching what a fresh scaffold would emit.
 - Entries are appended in insertion order (not sorted alphabetically) for deterministic behavior. If you want the index sorted, run a separate pass with the platform `edit` tool.
 - The `_(no entries yet)_` placeholder is only removed inside the section being updated — other empty sections retain theirs until they receive their first entry.
 - The script always exits 0. `updated: false` in the JSON is the failure signal.
-- If `wiki/index.md` does not exist, the script creates it with frontmatter + `# Index` heading. Subsequent invocations preserve everything except the `update_date` line, which is bumped to today.
+- If `wiki/index.md` does not exist, the script creates it with frontmatter + a `# Wiki Index` heading and seeds the four standard sections with `_(no entries yet)_` placeholders. Subsequent invocations preserve everything except the `update_date` line, which is bumped to today. (The scaffolder emits a richer `# Wiki Index — <project_name>` H1; autocreate here has no project context and produces the shorter form.)

@@ -1,7 +1,7 @@
 ---
 name: wiki-write-source-page
 description: Create a new page under `wiki/sources/` from a structured summary (typically produced by `wiki-summarize-source`). Writes exactly one file via a bundled Python script for deterministic, atomic behavior. Refuses to overwrite existing source pages. Use as part of an ingest workflow, after `wiki-summarize-source` and before cross-reference updates. Not directly invocable by the user — orchestrated by `/wiki-ingest`.
-argument-hint: "summary=<yaml or json from wiki-summarize-source> [related_sources=<comma-separated>] [tags=<comma-separated>] [vault_path=<absolute path>]"
+argument-hint: "summary=<json from wiki-summarize-source> [related_sources=<comma-separated>] [tags=<comma-separated>] [vault_path=<absolute path>]"
 user-invocable: false
 ---
 
@@ -29,7 +29,7 @@ Parse stdout as JSON. The script (stdlib only, ~140 lines) implements the algori
 
 1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
 
-2. **Parse `summary`** — a YAML or JSON structure matching the return shape of `wiki-summarize-source`.
+2. **Parse `summary`** — a JSON structure matching the return shape of `wiki-summarize-source` (passed via `--summary-json`, parsed with `json.loads`; YAML is not accepted).
 
 3. **Compute the target filename:**
    - Snake_case slug from `summary.title` (lowercase, non-alphanumeric → underscore, collapse runs, strip leading/trailing underscores).
@@ -93,7 +93,7 @@ warnings: [<string>, ...]   # optional, only present when non-fatal issues occur
 
 Or `created: false, reason: <string>` on failure (already exists, invalid summary, write error).
 
-Current `warnings` values include `source_date_not_iso: ...` (date could not be parsed as ISO and was dropped from frontmatter) and `source_date_not_string: ...` (non-string value).
+Current `warnings` values include `source_date_not_iso: ...` (date could not be parsed as ISO and was dropped from frontmatter), `source_date_not_string: ...` (non-string value), `key_points_not_list: ...` / `entities_not_list: ...` / `concepts_not_list: ...` (top-level summary field with wrong type, coerced to `[]`), `provenance_not_dict: ...` (provenance object arrived as non-dict, coerced to `{}`), and `domain_items_not_dict: ...` / `domain_items.<type>_not_list: ...` (per-bucket type errors, that bucket is skipped).
 
 ## Constraints
 
@@ -107,3 +107,5 @@ Current `warnings` values include `source_date_not_iso: ...` (date could not be 
 - Shell-escape the `--summary-json` argument carefully. Nested quotes or special characters in `key_points` or `title` can break the shell. For complex summaries, write to a temp file and pass via `--summary-json "$(cat /tmp/summary.json)"`.
 - The script exits 0 even on refusal to overwrite — check the `created` field in the JSON, not the shell exit code.
 - To *update* an existing source page (not create), use the platform `edit` tool directly. This skill only creates.
+- **No cross-section dedup.** A term appearing in both `summary.entities` and `summary.concepts` (or in an additional `domain_items` bucket like `characters`) produces one wikilink per section — e.g. `[[frodo]]` under both `## Entities` and `## Characters`. This is intentional: it reflects the taxonomic distinction the summarizer made. If your domain treats an item as strictly one type, ensure the summary places it in only one bucket.
+- **Defensive coercion.** If a summary field with an expected list type (`key_points`, `entities`, `concepts`, or a `domain_items` bucket) or the top-level `provenance` object arrives with the wrong Python type (e.g. a string instead of a list), the field is silently coerced to an empty default and a `<field>_not_list` / `provenance_not_dict` warning is surfaced in the return JSON. The page is still written, minus the offending section — orchestrators should inspect `warnings` before considering the ingest complete.

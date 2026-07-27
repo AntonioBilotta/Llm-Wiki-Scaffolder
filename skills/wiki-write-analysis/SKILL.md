@@ -1,7 +1,7 @@
 ---
 name: wiki-write-analysis
 description: Archive a substantive analysis, comparison, or derived synthesis as a new page under `wiki/analysis/` (Karpathy pattern - 'good answers can be filed back into the wiki'). Use when the user wants to preserve a wiki-based answer, save an exploration, archive a synthesis for future reference, or when a wiki-reader identifies an answer worth compounding into the knowledge base. Writes exactly one file via a bundled Python script; refuses to overwrite. Trigger keywords - 'archive this analysis', 'save this to the wiki', 'file this answer', 'preserve this synthesis'.
-argument-hint: "title=<string> content=<markdown> related_sources=<comma-separated wiki source page names> [tags=<comma-separated>] [vault_path=<absolute path>]"
+argument-hint: "title=<string> content=<markdown> [related_sources=<comma-separated wiki source page names>] [tags=<comma-separated>] [vault_path=<absolute path>]"
 user-invocable: false
 ---
 
@@ -40,8 +40,8 @@ Parse stdout as JSON. The script (stdlib only) writes the file with standard fro
    type: analysis
    creation_date: <today YYYY-MM-DD>
    update_date: <today YYYY-MM-DD>
-   related_sources: [source_a, source_b, ...]
-   tags: [<list from argument>]
+   related_sources: ["source_a", "source_b", ...]
+   tags: ["tag1", "tag2"]
    ---
 
    # <title>
@@ -49,7 +49,7 @@ Parse stdout as JSON. The script (stdlib only) writes the file with standard fro
    <content, verbatim from argument>
    ```
 
-   Note: `related_sources` contains **bare page names** (no `[[...]]` wrapping). Wikilink syntax is for the body only; YAML values are plain strings so parsers can read them uniformly.
+   Note: `related_sources` contains **bare page names** (no `[[...]]` wrapping). Wikilink syntax is for the body only; YAML values are plain strings so parsers can read them uniformly. Each list item is emitted as a JSON-quoted string (a strict subset of YAML), which guarantees round-trip stability even when a value contains a `#` (would otherwise start a YAML comment), a `:` (would parse as a dict), or a bare ISO date (would parse as `datetime.date`).
 
 4. **Write** the file.
 
