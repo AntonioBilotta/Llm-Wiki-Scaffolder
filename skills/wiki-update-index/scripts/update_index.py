@@ -52,8 +52,14 @@ def _normalize(name: str) -> str:
     Callers may pass a section as either the folder name (`open_questions`)
     or the display heading (`Open Questions`). Both should match the same
     scaffolded `## Open Questions` section rather than creating a duplicate.
+
+    Leading markdown heading markers (`## `, `# `, etc.) are stripped up-front
+    so a caller passing the visible heading form (`--section "## Entities"`)
+    does not produce a `## ## Entities` section. This is defensive input
+    normalization, not a documented invocation form.
     """
-    return re.sub(r"[_\s]+", " ", name).strip().lower()
+    stripped = re.sub(r"^#+\s+", "", name)
+    return re.sub(r"[_\s]+", " ", stripped).strip().lower()
 
 
 def find_section_bounds(lines: list[str], section: str) -> tuple[int | None, int | None]:
@@ -121,13 +127,35 @@ def main() -> None:
     today = datetime.now(timezone.utc).date().isoformat()
 
     if not idx_path.exists():
+        # Seed the four canonical sections (matching bin/scaffold.py:render_index)
+        # so the auto-created index converges to the same shape as a fresh scaffold
+        # regardless of the order of first inserts. Extra domain sections (e.g.
+        # `## Open Questions`, `## Decisions`) are appended by the section-not-found
+        # branch below on demand.
+        placeholder = "- _(no entries yet)_"
         idx_path.write_text(
             "---\n"
             "type: index\n"
             f"update_date: {today}\n"
             "---\n"
             "\n"
-            "# Index\n",
+            "# Index\n"
+            "\n"
+            "## Entities\n"
+            "\n"
+            f"{placeholder}\n"
+            "\n"
+            "## Concepts\n"
+            "\n"
+            f"{placeholder}\n"
+            "\n"
+            "## Sources\n"
+            "\n"
+            f"{placeholder}\n"
+            "\n"
+            "## Analysis\n"
+            "\n"
+            f"{placeholder}\n",
             encoding="utf-8",
         )
 
@@ -137,7 +165,14 @@ def main() -> None:
     while lines and lines[-1] == "":
         lines.pop()
 
-    new_entry = f"- [[{args.page}]] — {args.summary} · {today}"
+    # Collapse whitespace (including embedded newlines) in the summary. Without
+    # this, a multi-line summary breaks the index bullet contract
+    # `- [[page]] — summary · YYYY-MM-DD` — wiki-search's regex fails to match
+    # the entry, and the trailing lines survive as permanent orphans that
+    # subsequent runs cannot self-heal (the `- [[page]]` anchor matches only
+    # the first line during replacement).
+    summary_clean = re.sub(r"\s+", " ", args.summary).strip()
+    new_entry = f"- [[{args.page}]] — {summary_clean} · {today}"
 
     start, end = find_section_bounds(lines, args.section)
 

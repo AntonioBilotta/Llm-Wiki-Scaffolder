@@ -74,6 +74,14 @@ def main() -> None:
         print(json.dumps({"appended": False, "reason": "empty_summary"}))
         sys.exit(0)
 
+    # Collapse whitespace (including embedded newlines) in the summary. The
+    # `## [YYYY-MM-DD] kind | summary` prefix must be a single line so
+    # `grep '^## \['` returns full entries and downstream parsers can locate
+    # `Touched pages:` immediately after the heading. SKILL.md documents the
+    # kind as single-word for the same greppability reason; enforce the
+    # equivalent single-line invariant on summary here.
+    summary_clean = re.sub(r"\s+", " ", args.summary).strip()
+
     vault = Path(args.vault_path).expanduser().resolve()
     if not vault.is_dir():
         print(json.dumps({"appended": False, "reason": "vault_not_found", "vault_path": str(vault)}))
@@ -86,7 +94,7 @@ def main() -> None:
         log_path.write_text("# Log\n", encoding="utf-8")
 
     today = datetime.now(timezone.utc).date().isoformat()
-    prefix = f"## [{today}] {args.kind} | {args.summary.strip()}"
+    prefix = f"## [{today}] {args.kind} | {summary_clean}"
     entry_lines: list[str] = ["", prefix]
 
     touched = [p.strip() for p in args.touched_pages.split(",") if p.strip()]

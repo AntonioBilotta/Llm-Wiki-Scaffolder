@@ -172,7 +172,15 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
     # first sequence of exactly N backticks, so pick the shortest run of
     # backticks not present inside the path, and pad with spaces when the
     # value starts or ends with a backtick.
-    prov_line = f"- **Provenance**: {_code_span(raw_path)}"
+    #
+    # When `raw_path` is missing/empty (an unusual summary shape — the
+    # wiki-summarize-source SKILL contract requires it), fall back to an
+    # italic placeholder rather than emitting an empty code span (`` `` ``)
+    # which is visually confusing and semantically empty.
+    if raw_path:
+        prov_line = f"- **Provenance**: {_code_span(raw_path)}"
+    else:
+        prov_line = "- **Provenance**: _(unknown)_"
     if original_url:
         prov_line += f" · [original]({original_url})"
     lines.append(prov_line)

@@ -159,7 +159,11 @@ def main() -> None:
         "",
         f"# {args.title}",
         "",
-        args.content.rstrip(),
+        # Strip leading blank lines so the emitted body reads as
+        # `# <title>` \n \n <first content line>, matching what the SKILL.md
+        # documents ("script wraps its own `# <title>` immediately before the
+        # content"). Trailing whitespace is normalized as before.
+        args.content.strip("\n").rstrip(),
         "",
     ]
 
