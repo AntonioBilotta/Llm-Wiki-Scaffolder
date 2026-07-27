@@ -395,7 +395,14 @@ def resolve_type(base_type: str, fiction: bool, nonfiction: bool) -> str:
 
 
 def render_index(project_name: str, extra_wiki_folders: List[str], today: str) -> str:
-    """Generate wiki/index.md content."""
+    """Generate wiki/index.md content.
+
+    Sections use a bullet-list format (`- [[page]] — summary · YYYY-MM-DD`)
+    consumed and appended-to by the `wiki-update-index` skill. Empty
+    sections carry a single `_(no entries yet)_` placeholder that the
+    skill removes on the first real insert.
+    """
+    placeholder = "- _(no entries yet)_"
     lines = [
         "---",
         "type: index",
@@ -408,15 +415,11 @@ def render_index(project_name: str, extra_wiki_folders: List[str], today: str) -
         "",
         "## Entities",
         "",
-        "| Page | Description | Last modified |",
-        "|------|-------------|---------------|",
-        "| _(empty)_ | | |",
+        placeholder,
         "",
         "## Concepts",
         "",
-        "| Page | Description | Last modified |",
-        "|------|-------------|---------------|",
-        "| _(empty)_ | | |",
+        placeholder,
         "",
     ]
     for folder in extra_wiki_folders:
@@ -424,23 +427,17 @@ def render_index(project_name: str, extra_wiki_folders: List[str], today: str) -
         lines.extend([
             f"## {heading}",
             "",
-            "| Page | Description | Last modified |",
-            "|------|-------------|---------------|",
-            "| _(empty)_ | | |",
+            placeholder,
             "",
         ])
     lines.extend([
         "## Sources",
         "",
-        "| Page | Description | Last modified |",
-        "|------|-------------|---------------|",
-        "| _(empty)_ | | |",
+        placeholder,
         "",
         "## Analysis",
         "",
-        "| Page | Description | Last modified |",
-        "|------|-------------|---------------|",
-        "| _(empty)_ | | |",
+        placeholder,
         "",
     ])
     return "\n".join(lines)

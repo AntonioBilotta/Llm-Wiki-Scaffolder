@@ -27,27 +27,29 @@ Parse stdout as JSON. If the target section does not exist, the script appends i
 
 1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
 
-2. **Read** `<vault_path>/wiki/index.md`. If it does not exist, create it with a minimal `# Index` heading, then continue.
+2. **Read** `<vault_path>/wiki/index.md`. If it does not exist, create it with a minimal frontmatter block (`type: index`, `update_date: <today>`) plus a `# Index` heading, then continue.
 
 3. **Locate the section** matching `<section>`:
-   - Match `## <section>` case-insensitively after normalization (`snake_case` vs `Title Case` normalized to lowercase-words).
+   - Match `## <section>` case-insensitively.
    - Standard sections: `Entities`, `Concepts`, `Sources`, `Analysis`, plus any domain-specific sections the vault has configured.
 
-4. **If the section does not exist**, create it:
-   - Insert it alphabetically among peers.
-   - Convention: `Analysis` and `Log` go last if present.
+4. **If the section does not exist**, create it by appending `## <section>` at the end of the file.
 
-5. **Within the section**, locate any existing line for `<page>`:
-   - A line starting with `- [[<page>]]` or containing exactly that wikilink.
+5. **Drop the `_(no entries yet)_` placeholder** if present inside the section (added by the scaffolder to keep empty sections visually meaningful).
+
+6. **Within the section**, locate any existing line for `<page>`:
+   - A line starting with `- [[<page>]]`.
    - If found, **replace** the line with the new entry (updated summary, today's date).
-   - If not found, **insert** the new entry alphabetically among peers.
+   - If not found, **append** the new entry at the end of the section (before any trailing blank line).
 
-6. **New entry format:**
+7. **New entry format:**
    ```
    - [[<page>]] — <summary> · <today YYYY-MM-DD>
    ```
 
-7. **Write back** the whole file. Only `index.md` is touched.
+8. **Bump `update_date`** in the file's frontmatter to today if that field is present.
+
+9. **Write back** the whole file. Only `index.md` is touched.
 
 ## Return value
 
@@ -70,6 +72,7 @@ Or `updated: false, reason: <string>` on failure.
 ## Gotchas
 
 - Section matching is case-insensitive but the section is written with the exact capitalization passed in `--section`. Prefer canonical capitalization (`Entities`, not `entities` or `ENTITIES`).
-- The new entry is appended at the end of the section (not sorted alphabetically) for deterministic behavior. If you want the index sorted, run a separate pass with the platform `edit` tool.
+- Entries are appended in insertion order (not sorted alphabetically) for deterministic behavior. If you want the index sorted, run a separate pass with the platform `edit` tool.
+- The `_(no entries yet)_` placeholder is only removed inside the section being updated — other empty sections retain theirs until they receive their first entry.
 - The script always exits 0. `updated: false` in the JSON is the failure signal.
-- If `wiki/index.md` does not exist, the script creates it with a `# Index` heading. Subsequent invocations preserve it.
+- If `wiki/index.md` does not exist, the script creates it with frontmatter + `# Index` heading. Subsequent invocations preserve everything except the `update_date` line, which is bumped to today.
