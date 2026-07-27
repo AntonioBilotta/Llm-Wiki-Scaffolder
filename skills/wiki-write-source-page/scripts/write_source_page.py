@@ -33,26 +33,36 @@ def build_page(summary: dict, today: str) -> str:
     prov = summary.get("provenance") or {}
     raw_path = prov.get("raw_path", "")
     original_url = prov.get("original_url")
+    source_date = summary.get("date")
 
     lines: list[str] = [
         "---",
         "type: source",
         f"creation_date: {today}",
         f"update_date: {today}",
+    ]
+    # Preserve the source's original date separately from ingest date so
+    # wiki-lint-check stale detection can sort by publication date, not
+    # ingest date (two sources ingested same day may be years apart).
+    if source_date:
+        lines.append(f"source_date: {source_date}")
+    lines.extend([
         "related_sources: []",
         "tags: []",
         "---",
         "",
         f"# {title}",
         "",
-    ]
+    ])
 
-    prov_line = f"**Provenance**: `{raw_path}`"
+    # Provenance + Date as a bullet list so each renders as a distinct item
+    # (adjacent non-blank lines would collapse into one paragraph in Markdown).
+    prov_line = f"- **Provenance**: `{raw_path}`"
     if original_url:
         prov_line += f" · [original]({original_url})"
     lines.append(prov_line)
-    if summary.get("date"):
-        lines.append(f"**Date**: {summary['date']}")
+    if source_date:
+        lines.append(f"- **Date**: {source_date}")
     lines.append("")
 
     key_points = summary.get("key_points") or []
@@ -74,8 +84,12 @@ def build_page(summary: dict, today: str) -> str:
 
     domain_items = summary.get("domain_items") or {}
     for dtype, items in domain_items.items():
+        # Skip keys that would duplicate the hardcoded sections above.
+        if dtype in ("entities", "concepts"):
+            continue
         if items:
-            lines.append(f"## {dtype.capitalize()}")
+            heading = dtype.replace("_", " ").title()
+            lines.append(f"## {heading}")
             lines.append("")
             for item in items:
                 lines.append(f"- [[{slugify(item)}]]")

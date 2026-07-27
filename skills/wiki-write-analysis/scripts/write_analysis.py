@@ -89,7 +89,11 @@ def main() -> None:
     tags = parse_list_arg(args.tags)
     today = date.today().isoformat()
 
-    related_yaml = "[" + ", ".join(f"[[{name}]]" for name in related) + "]"
+    # Bare page names (no `[[...]]` wrapping) — see wiki-conventions.
+    # This is what wiki-lint-check and wiki-read-page expect: a YAML list of
+    # strings, each a page name under wiki/sources/. `[[wikilink]]` syntax
+    # belongs to the body, not to YAML values.
+    related_yaml = "[" + ", ".join(related) + "]"
     tags_yaml = "[" + ", ".join(tags) + "]"
 
     lines: list[str] = [

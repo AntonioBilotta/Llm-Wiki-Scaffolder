@@ -22,7 +22,7 @@ Produce a Lint Report by running 7 checks over the vault. No writes.
    1. **Contradictions** — for each factual claim in scope, look for another page that directly contradicts it. Flag with page-pair references.
    2. **Orphans** — pages with zero inbound `[[wikilinks]]` from any other page (excluding index/log/overview).
    3. **Missing cross-references** — for each page in scope, scan its body for mentions of known entity/concept/domain-item names that lack the corresponding `[[wikilink]]`. Only flag proposals where the target page name is unambiguous.
-   4. **Stale claims** — sort `wiki/sources/` by `creation_date` ascending. For each older claim referenced across pages, check whether a newer source contradicts or supersedes it. Flag with the specific pages and the newer source.
+   4. **Stale claims** — sort `wiki/sources/` by `source_date` ascending (fallback to `creation_date` if `source_date` is missing). For each older claim referenced across pages, check whether a newer source contradicts or supersedes it. Flag with the specific pages and the newer source.
    5. **Missing pages** — entities/concepts/domain items mentioned frequently (≥3 mentions across pages) but lacking their own page.
    6. **Knowledge gaps** — topics with thin coverage: fewer than 2 sources touching, or fewer than 2 cross-links to other pages.
    7. **Frontmatter integrity** — for each page in scope, verify required fields: `type`, `creation_date`, `update_date`. For missing `update_date`, mark `auto_repairable: true` with `proposed_fix: <today YYYY-MM-DD>`. For missing `type` or `creation_date`, mark `auto_repairable: false` (needs user judgment). Also validate `related_sources` are actual pages (not broken links).

@@ -39,15 +39,15 @@ Parse stdout as JSON. The script (stdlib only, ~140 lines) implements the algori
    type: source
    creation_date: <today YYYY-MM-DD>
    update_date: <today YYYY-MM-DD>
+   source_date: <summary.date>       # only if summary.date is set
    related_sources: []
    tags: []
    ---
 
    # <title>
 
-   **Provenance**: `<raw_path>`
-   [If original_url is provided] · [original](<original_url>)
-   **Date**: <date>
+   - **Provenance**: `<raw_path>` [· [original](<original_url>) if provided]
+   - **Date**: <summary.date>          # only if summary.date is set
 
    ## Summary
 
@@ -65,15 +65,15 @@ Parse stdout as JSON. The script (stdlib only, ~140 lines) implements the algori
    - [[<snake_case_concept_1>]]
    - [[<snake_case_concept_2>]]
 
-   [For each domain item type present in summary.domain_items:]
+   [For each domain item type present in summary.domain_items (excluding 'entities'/'concepts'):]
 
-   ## <Type capitalized>
+   ## <Type Title Cased>
 
    - [[<snake_case_item_1>]]
    - [[<snake_case_item_2>]]
    ```
 
-   Omit sections that would be empty.
+   Omit sections that would be empty. `source_date` in frontmatter preserves the source's publication date separately from ingest date; used by wiki-lint-check stale detection.
 
 5. **Write** the file. Return the absolute path and a copy of what was written.
 
