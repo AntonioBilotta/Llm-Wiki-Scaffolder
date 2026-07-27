@@ -61,7 +61,7 @@ line_prefix: "## [<date>] <kind> | ..."
 ## Gotchas
 
 - `--kind` is validated as `^[a-z][a-z0-9-]*$`. Spaces, uppercase, and punctuation are rejected — use `batch-ingest`, not `batch ingest` or `Batch Ingest`.
-- Standard kinds: `ingest` (single-source), `batch-ingest` (folder), `query` (wiki-query archival), `lint` (wiki-lint report), `init` (reserved for the scaffolder's first entry — do not emit from workflows), `other` (fallback for one-offs).
+- Standard kinds: `ingest` (single-source), `batch-ingest` (folder), `query` (wiki-query archival), `lint` (wiki-lint report), `other` (fallback for one-offs). `init` is **reserved for the scaffolder's first entry** and is rejected here at runtime (`reason: "kind_reserved"`) — workflows must not emit it.
 - `--touched-pages` receives bare page names (no `.md`, no `[[]]` wrapping). The script wraps them. Passing `[[foo_bar]]` produces `[[[[foo_bar]]]]` in the log.
 - The script always exits 0. Check the `appended` field for the outcome.
 - If `wiki/log.md` does not exist, the script creates it with a `# Log` heading. Subsequent invocations preserve it.

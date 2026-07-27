@@ -19,7 +19,7 @@ import argparse
 import json
 import re
 import sys
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -52,6 +52,24 @@ def main() -> None:
         )
         sys.exit(0)
 
+    # `init` is reserved for the scaffolder's first entry (see SKILL.md gotcha).
+    # Reject it here so runtime workflows can't silently create a second
+    # `## [YYYY-MM-DD] init | ...` line that would make the timeline ambiguous
+    # ("which init is the real one?"). Workflows should use `ingest`,
+    # `batch-ingest`, `query`, `lint`, or `other` instead.
+    if args.kind == "init":
+        print(
+            json.dumps(
+                {
+                    "appended": False,
+                    "reason": "kind_reserved",
+                    "detail": "'init' is reserved for the scaffolder; use 'other' from workflows",
+                    "kind": args.kind,
+                }
+            )
+        )
+        sys.exit(0)
+
     if not args.summary.strip():
         print(json.dumps({"appended": False, "reason": "empty_summary"}))
         sys.exit(0)
@@ -67,7 +85,7 @@ def main() -> None:
     if not log_path.exists():
         log_path.write_text("# Log\n", encoding="utf-8")
 
-    today = date.today().isoformat()
+    today = datetime.now(timezone.utc).date().isoformat()
     prefix = f"## [{today}] {args.kind} | {args.summary.strip()}"
     entry_lines: list[str] = ["", prefix]
 

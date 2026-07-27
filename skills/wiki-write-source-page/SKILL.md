@@ -1,7 +1,7 @@
 ---
 name: wiki-write-source-page
 description: Create a new page under `wiki/sources/` from a structured summary (typically produced by `wiki-summarize-source`). Writes exactly one file via a bundled Python script for deterministic, atomic behavior. Refuses to overwrite existing source pages. Use as part of an ingest workflow, after `wiki-summarize-source` and before cross-reference updates. Not directly invocable by the user — orchestrated by `/wiki-ingest`.
-argument-hint: "summary=<yaml or json from wiki-summarize-source> [vault_path=<absolute path>]"
+argument-hint: "summary=<yaml or json from wiki-summarize-source> [related_sources=<comma-separated>] [tags=<comma-separated>] [vault_path=<absolute path>]"
 user-invocable: false
 ---
 
@@ -16,10 +16,14 @@ Run the bundled script via the platform terminal tool:
 ```bash
 python3 scripts/write_source_page.py \
   --vault-path "<absolute vault path>" \
-  --summary-json '<compact JSON string>'
+  --summary-json '<compact JSON string>' \
+  [--related-sources "src_a,src_b"] \
+  [--tags "tag1,tag2"]
 ```
 
 Parse stdout as JSON. The script (stdlib only, ~140 lines) implements the algorithm below deterministically. Check the `created` field in the JSON — exit code is always 0.
+
+`--related-sources` and `--tags` are optional. By default both frontmatter fields are emitted as empty lists (`[]`) — populated later by the ingest orchestrator via file-edit tools as cross-references are discovered. Pass them at creation only when the summary already knows the relations.
 
 ## Algorithm
 
@@ -40,8 +44,8 @@ Parse stdout as JSON. The script (stdlib only, ~140 lines) implements the algori
    creation_date: <today YYYY-MM-DD>
    update_date: <today YYYY-MM-DD>
    source_date: <summary.date>       # only if summary.date is set
-   related_sources: []
-   tags: []
+   related_sources: [<from --related-sources, or [] if omitted>]
+   tags: [<from --tags, or [] if omitted>]
    ---
 
    # <title>
@@ -73,7 +77,7 @@ Parse stdout as JSON. The script (stdlib only, ~140 lines) implements the algori
    - [[<snake_case_item_2>]]
    ```
 
-   Omit sections that would be empty. `source_date` in frontmatter preserves the source's publication date separately from ingest date; used by wiki-lint-check stale detection.
+   Omit sections that would be empty. `source_date` in frontmatter preserves the source's publication date separately from ingest date; used by wiki-lint-check stale detection. The script normalizes `summary.date` to a pure `YYYY-MM-DD` string (accepts `YYYY-MM-DD` and full ISO `YYYY-MM-DDTHH:MM:SS[Z|±HH:MM]`, extracting the date component). Unparseable values (e.g. `"May 2024"`, `"2024/05/10"`) are dropped from the frontmatter — they would otherwise break the lint stale-check sort by mixing `str`/`datetime.date`/`datetime.datetime` — but are kept verbatim in the body's `- **Date**:` line for human readability, with a warning surfaced in the return JSON.
 
 5. **Write** the file. Return the absolute path and a copy of what was written.
 
@@ -84,9 +88,12 @@ created: true
 path: <absolute path>
 page: <slug>
 body: <the written content, for auditability>
+warnings: [<string>, ...]   # optional, only present when non-fatal issues occurred
 ```
 
 Or `created: false, reason: <string>` on failure (already exists, invalid summary, write error).
+
+Current `warnings` values include `source_date_not_iso: ...` (date could not be parsed as ISO and was dropped from frontmatter) and `source_date_not_string: ...` (non-string value).
 
 ## Constraints
 

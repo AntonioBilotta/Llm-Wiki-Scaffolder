@@ -71,7 +71,7 @@ Or `updated: false, reason: <string>` on failure.
 
 ## Gotchas
 
-- Section matching is case-insensitive but the section is written with the exact capitalization passed in `--section`. Prefer canonical capitalization (`Entities`, not `entities` or `ENTITIES`).
+- Section matching is case-insensitive AND treats `_` and whitespace as equivalent, so `--section open_questions` matches a scaffolded `## Open Questions` heading (no duplicate section is created). When the section does not yet exist and needs to be created: for the four standard sections (`Entities`, `Concepts`, `Sources`, `Analysis`) the heading is written in canonical Title Case; for non-standard sections the same Title Case transformation used by the scaffolder (`folder.replace("_", " ").title()`) is applied, so `--section open_questions` creates `## Open Questions` — matching what a fresh scaffold would emit.
 - Entries are appended in insertion order (not sorted alphabetically) for deterministic behavior. If you want the index sorted, run a separate pass with the platform `edit` tool.
 - The `_(no entries yet)_` placeholder is only removed inside the section being updated — other empty sections retain theirs until they receive their first entry.
 - The script always exits 0. `updated: false` in the JSON is the failure signal.

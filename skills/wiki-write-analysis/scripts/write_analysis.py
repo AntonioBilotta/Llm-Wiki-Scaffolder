@@ -19,7 +19,7 @@ import json
 import re
 import sys
 import unicodedata
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -99,14 +99,54 @@ def main() -> None:
 
     related = parse_list_arg(args.related_sources)
     tags = parse_list_arg(args.tags)
-    today = date.today().isoformat()
+    today = datetime.now(timezone.utc).date().isoformat()
+
+    # Guard: content must not start with `---`. If it does, the resulting page
+    # would have two frontmatter blocks, confusing readers and parsers.
+    # SKILL.md's gotcha documents this constraint; enforce it here as a
+    # machine-checkable refusal so misuse fails loudly, not silently.
+    if args.content.lstrip().startswith("---"):
+        print(json.dumps({
+            "created": False,
+            "reason": "content_starts_with_frontmatter_fence",
+            "detail": "--content must not start with `---`; the script wraps its own frontmatter.",
+        }))
+        sys.exit(0)
+
+    # Symmetric guard: content must not start with a Markdown H1 heading
+    # (`# ` — hash followed by whitespace), because the script emits its own
+    # `# <title>` H1 immediately before the content. A leading H1 would
+    # produce two adjacent H1s (see SKILL.md gotcha: "Do NOT include ... an
+    # H1 heading in the content — the script wraps both"). Fail loudly
+    # instead of writing a visibly broken page.
+    #
+    # Only H1 is rejected: `## Subsection` or `### Deep dive` are legitimate
+    # opening structures for an analysis, and `#tag inline mention.` is a
+    # legitimate Obsidian hashtag start-of-paragraph.
+    if re.match(r"^#\s", args.content.lstrip()):
+        print(json.dumps({
+            "created": False,
+            "reason": "content_starts_with_h1",
+            "detail": "--content must not start with `# ` (H1); the script wraps its own `# <title>`. `##`/`###` and `#tag` are allowed.",
+        }))
+        sys.exit(0)
 
     # Bare page names (no `[[...]]` wrapping) — see wiki-conventions.
     # This is what wiki-lint-check and wiki-read-page expect: a YAML list of
     # strings, each a page name under wiki/sources/. `[[wikilink]]` syntax
     # belongs to the body, not to YAML values.
-    related_yaml = "[" + ", ".join(related) + "]"
-    tags_yaml = "[" + ", ".join(tags) + "]"
+    #
+    # Each item is emitted as a JSON string (JSON strings are a strict subset
+    # of YAML strings), which guarantees the value parses back as a string
+    # regardless of content. Without quoting, YAML flow-sequence parsing has
+    # sharp edges that corrupt output:
+    #   - a tag starting with `#` starts a YAML comment → parse error
+    #   - `key: value` (colon+space) inside `[...]` becomes a dict, not a str
+    #   - `2026-01-01` (ISO date) becomes a datetime.date, not a str
+    # Quoting via json.dumps sidesteps all three. ensure_ascii=False preserves
+    # unicode readability (accents, emoji) instead of escaping to \uXXXX.
+    related_yaml = "[" + ", ".join(json.dumps(x, ensure_ascii=False) for x in related) + "]"
+    tags_yaml = "[" + ", ".join(json.dumps(x, ensure_ascii=False) for x in tags) + "]"
 
     lines: list[str] = [
         "---",

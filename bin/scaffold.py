@@ -25,7 +25,7 @@ import json
 import os
 import shutil
 import sys
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
@@ -423,7 +423,7 @@ def render_index(project_name: str, extra_wiki_folders: List[str], today: str) -
         "",
     ]
     for folder in extra_wiki_folders:
-        heading = folder.replace("_", " ").capitalize()
+        heading = folder.replace("_", " ").title()
         lines.extend([
             f"## {heading}",
             "",
@@ -445,19 +445,21 @@ def render_index(project_name: str, extra_wiki_folders: List[str], today: str) -
 
 def render_log(project_name: str, raw_folders: List[str], extra_wiki_folders: List[str], today: str, include_agents: bool) -> str:
     """Generate wiki/log.md content with the init entry."""
-    raw_list = ", ".join(raw_folders + ["assets"])
-    wiki_extras = ", ".join(["entities", "concepts"] + extra_wiki_folders + ["sources", "analysis"])
-    customization = "copilot-instructions.md, instructions/wiki-conventions"
-    if include_agents:
-        customization += ", agents/wiki-{reader,maintainer,auditor}"
+    # Format the init entry using the same shape wiki-append-log produces:
+    #   ## [YYYY-MM-DD] <kind> | <summary>
+    #   Touched pages: [[a]], [[b]]
+    # so `grep '^Touched pages:'` works uniformly across init and later entries.
+    # The structural details (raw folders, wiki folders, customization files)
+    # are collapsed into the summary line — the log is a timeline, not a
+    # bill-of-materials.
+    n_raw = len(raw_folders) + 1  # + assets
+    n_wiki = len(["entities", "concepts"] + extra_wiki_folders + ["sources", "analysis"])
+    role_scope = "user-level skills + vault agents" if include_agents else "user-level skills only"
     return (
         f"# Log — {project_name}\n"
         f"\n"
-        f"## [{today}] init | Wiki creation\n"
-        f"Pages created: [[overview]], [[index]]\n"
-        f"Structure initialized: raw/ ({raw_list}), wiki/ ({wiki_extras})\n"
-        f"Customization: .github/ ({customization}). Operational commands (/wiki-ingest, "
-        f"/wiki-lint, /wiki-query) come from user-level install — see .github/copilot-instructions.md.\n"
+        f"## [{today}] init | Wiki scaffolded ({n_raw} raw folders, {n_wiki} wiki folders, {role_scope})\n"
+        f"Touched pages: [[overview]], [[index]]\n"
     )
 
 
@@ -883,9 +885,16 @@ def main(argv: Optional[List[str]] = None) -> int:
         if args.extra_wiki_folders else config["extra_wiki_folders"]
     )
 
-    today = date.today().isoformat()
+    today = datetime.now(timezone.utc).date().isoformat()
     display_type = config["display_type"]
-    extra_types_str = " | ".join(config["extra_page_types"]) if config["extra_page_types"] else "(none)"
+    # Emit " | <extra1> | <extra2>" when the domain has extra page types,
+    # or an empty string when it doesn't. The template's fixed "| " separator
+    # was removed so an empty extras list yields "analysis" (clean) instead of
+    # "analysis | (none)" (awkward) or "analysis | " (trailing pipe).
+    extra_types_str = (
+        " | " + " | ".join(config["extra_page_types"])
+        if config["extra_page_types"] else ""
+    )
 
     mapping = {
         "{{PROJECT_NAME}}": args.name,

@@ -17,15 +17,18 @@ Every page under `wiki/` (except `index.md` and `log.md`) must start with YAML f
 
 ```yaml
 ---
-type: entity | concept | source | analysis | {{DOMAIN_EXTRA_TYPES}}
-creation_date: YYYY-MM-DD
-update_date: YYYY-MM-DD
-related_sources: []        # list of links to pages in wiki/sources/
+type: entity | concept | source | analysis{{DOMAIN_EXTRA_TYPES}}
+creation_date: YYYY-MM-DD   # date the page was created in the wiki
+update_date: YYYY-MM-DD     # bumped on every edit
+source_date: YYYY-MM-DD     # source pages only, optional: original publication date (used by lint stale-detection)
+related_sources: []         # list of bare page names under wiki/sources/ (no `[[...]]` wrapping)
 tags: []
 ---
 ```
 
 `index.md` uses `type: index`; `log.md` has no frontmatter (append-only chronological log); `overview.md` uses `type: overview`.
+
+> [!note] Date fields (`creation_date`, `update_date`, `source_date`) are written as ISO strings but a YAML parser (e.g. PyYAML `safe_load`) returns them as `datetime.date` objects, not strings. This is round-trip stable (ISO re-serializes identically). Consumers that compare dates should use date comparison, not string equality.
 
 ## Naming
 

@@ -19,7 +19,7 @@ import json
 import re
 import sys
 import unicodedata
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 
 
@@ -44,13 +44,101 @@ def slugify(text: str) -> str:
     return ""
 
 
-def build_page(summary: dict, today: str) -> str:
-    """Compose the source page markdown from a summary dict."""
+def parse_list_arg(raw: str) -> list[str]:
+    """Split a comma-separated string into a stripped list of non-empty items."""
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+def _yaml_flow_list(items: list[str]) -> str:
+    """Emit a YAML flow sequence with each item JSON-quoted.
+
+    JSON strings are a strict subset of YAML strings, so json.dumps guarantees
+    the value parses back as a string regardless of content (tags with `#`,
+    values with `:`, ISO dates that would otherwise become datetime.date).
+    Kept in sync with write_analysis.py's identical helper.
+    """
+    return "[" + ", ".join(json.dumps(x, ensure_ascii=False) for x in items) + "]"
+
+
+def _code_span(value: str) -> str:
+    """Wrap `value` in a Markdown code span, picking a fence that survives
+    any backticks the value itself may contain.
+
+    Per CommonMark, a code span opened by N backticks is closed by the first
+    run of exactly N backticks. So we choose the shortest run of backticks
+    not present in `value`. If `value` starts or ends with a backtick, we
+    pad with a single space on that side (the CommonMark stripping rule
+    removes exactly one leading and one trailing space).
+    """
+    if "`" not in value:
+        return f"`{value}`"
+    # Find the smallest run length not present in the value.
+    n = 1
+    while ("`" * n) in value:
+        n += 1
+    fence = "`" * n
+    pad_left = " " if value.startswith("`") else ""
+    pad_right = " " if value.endswith("`") else ""
+    return f"{fence}{pad_left}{value}{pad_right}{fence}"
+
+
+def _normalize_source_date(raw) -> tuple[str | None, str | None]:
+    """Coerce `raw` into a clean `YYYY-MM-DD` string for the `source_date`
+    frontmatter field, or return `(None, warning)` if it cannot be parsed as
+    an ISO date/datetime.
+
+    Rationale: `wiki-lint-check` §3.4 sorts `wiki/sources/` by `source_date`
+    ascending. PyYAML `safe_load` returns `datetime.date` for `YYYY-MM-DD`,
+    `datetime.datetime` for `YYYY-MM-DDTHH:MM:SS[Z]`, and `str` for anything
+    else — mixing these in a `sorted()` raises `TypeError`. By forcing the
+    stored value to a pure date string, we guarantee uniform types across
+    the vault.
+
+    Accepts:
+      - `YYYY-MM-DD` → passed through unchanged
+      - `YYYY-MM-DDTHH:MM:SS` (with optional fractional seconds, `Z`, or
+         `+HH:MM` timezone) → date component extracted
+    Rejects anything else (e.g. `"May 2024"`, `"2024/05/10"`) and returns
+    a warning; the caller writes the page without the `source_date` field
+    and surfaces the warning to the user via JSON output.
+    """
+    if raw is None:
+        return None, None
+    if not isinstance(raw, str) or not raw.strip():
+        return None, f"source_date_not_string: {raw!r}"
+    text = raw.strip()
+    # Python 3.8/3.9 `datetime.fromisoformat` does not accept the trailing `Z`
+    # suffix (added in 3.11). Rewrite to the equivalent explicit UTC offset
+    # so the parse works uniformly across supported Python versions.
+    normalized = text.replace("Z", "+00:00") if text.endswith("Z") else text
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        return None, (
+            f"source_date_not_iso: {text!r} — dropped from frontmatter "
+            f"(consumers require YYYY-MM-DD or YYYY-MM-DDTHH:MM:SS)"
+        )
+    return parsed.date().isoformat(), None
+
+
+def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -> tuple[str, list[str]]:
+    """Compose the source page markdown from a summary dict.
+
+    Returns (body, warnings). `warnings` collects non-fatal issues (e.g. an
+    unparseable `source_date` that was dropped from frontmatter but kept
+    verbatim in the body's Date line for human readability).
+    """
+    warnings: list[str] = []
     title = summary["title"]
     prov = summary.get("provenance") or {}
     raw_path = prov.get("raw_path", "")
     original_url = prov.get("original_url")
-    source_date = summary.get("date")
+    raw_source_date = summary.get("date")
+    normalized_source_date, date_warning = _normalize_source_date(raw_source_date)
+    if date_warning:
+        warnings.append(date_warning)
 
     lines: list[str] = [
         "---",
@@ -60,12 +148,15 @@ def build_page(summary: dict, today: str) -> str:
     ]
     # Preserve the source's original date separately from ingest date so
     # wiki-lint-check stale detection can sort by publication date, not
-    # ingest date (two sources ingested same day may be years apart).
-    if source_date:
-        lines.append(f"source_date: {source_date}")
+    # ingest date (two sources ingested same day may be years apart). Only
+    # emit the frontmatter field when the value normalized to a pure date;
+    # unparseable values are surfaced via `warnings` instead of being written
+    # (which would break `sorted()` in the lint check).
+    if normalized_source_date:
+        lines.append(f"source_date: {normalized_source_date}")
     lines.extend([
-        "related_sources: []",
-        "tags: []",
+        f"related_sources: {_yaml_flow_list(related)}",
+        f"tags: {_yaml_flow_list(tags)}",
         "---",
         "",
         f"# {title}",
@@ -74,12 +165,23 @@ def build_page(summary: dict, today: str) -> str:
 
     # Provenance + Date as a bullet list so each renders as a distinct item
     # (adjacent non-blank lines would collapse into one paragraph in Markdown).
-    prov_line = f"- **Provenance**: `{raw_path}`"
+    #
+    # Fence adaptively: a single-backtick code span breaks if `raw_path`
+    # itself contains backticks (unlikely but valid on POSIX filesystems).
+    # Per CommonMark, a code span opened by N backticks is closed by the
+    # first sequence of exactly N backticks, so pick the shortest run of
+    # backticks not present inside the path, and pad with spaces when the
+    # value starts or ends with a backtick.
+    prov_line = f"- **Provenance**: {_code_span(raw_path)}"
     if original_url:
         prov_line += f" · [original]({original_url})"
     lines.append(prov_line)
-    if source_date:
-        lines.append(f"- **Date**: {source_date}")
+    # Body's `- **Date**:` line uses the caller-supplied value (or the
+    # normalized one when available) — this stays human-readable even for
+    # non-ISO inputs like "May 2024".
+    if raw_source_date:
+        display_date = normalized_source_date if normalized_source_date else raw_source_date
+        lines.append(f"- **Date**: {display_date}")
     lines.append("")
 
     key_points = summary.get("key_points") or []
@@ -90,6 +192,10 @@ def build_page(summary: dict, today: str) -> str:
             lines.append(f"- {kp}")
         lines.append("")
 
+    # Dedup happens per-section (Entities set, Concepts set) intentionally.
+    # A term that appears in both `summary.entities` and `summary.concepts` will
+    # produce two wikilinks (one in each section) pointing to the same page —
+    # this reflects the taxonomic distinction the summarizer made, not a bug.
     for section_name, key in (("Entities", "entities"), ("Concepts", "concepts")):
         items = summary.get(key) or []
         if items:
@@ -128,7 +234,7 @@ def build_page(summary: dict, today: str) -> str:
                     lines.append(f"- [[{slug}]]")
                 lines.append("")
 
-    return "\n".join(lines).rstrip() + "\n"
+    return "\n".join(lines).rstrip() + "\n", warnings
 
 
 def main() -> None:
@@ -138,6 +244,18 @@ def main() -> None:
         "--summary-json",
         required=True,
         help="Compact JSON string with the summary (title required; others optional).",
+    )
+    parser.add_argument(
+        "--related-sources",
+        default="",
+        help="Optional comma-separated wiki source page names (without .md) "
+             "to seed the `related_sources` frontmatter. Usually empty at creation "
+             "time — populated later by the ingest orchestrator via file-edit tools.",
+    )
+    parser.add_argument(
+        "--tags",
+        default="",
+        help="Optional comma-separated tags to seed the `tags` frontmatter.",
     )
     args = parser.parse_args()
 
@@ -182,11 +300,21 @@ def main() -> None:
         )
         sys.exit(0)
 
-    today = date.today().isoformat()
-    body = build_page(summary, today)
+    today = datetime.now(timezone.utc).date().isoformat()
+    related = parse_list_arg(args.related_sources)
+    tags = parse_list_arg(args.tags)
+    body, warnings = build_page(summary, today, related, tags)
     target.write_text(body, encoding="utf-8")
 
-    print(json.dumps({"created": True, "path": str(target), "page": slug}))
+    # `body` is included for auditability, as documented in SKILL.md's return
+    # value. Callers that only need the path/slug can ignore it.
+    # `warnings` surfaces non-fatal issues (e.g. an unparseable `source_date`
+    # that was dropped from the frontmatter) so the caller can present them
+    # to the user without needing to re-parse the emitted body.
+    result: dict = {"created": True, "path": str(target), "page": slug, "body": body}
+    if warnings:
+        result["warnings"] = warnings
+    print(json.dumps(result))
 
 
 if __name__ == "__main__":

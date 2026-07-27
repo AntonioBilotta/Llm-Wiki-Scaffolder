@@ -23,11 +23,37 @@ import argparse
 import json
 import re
 import sys
-from datetime import date
+from datetime import datetime, timezone
 from pathlib import Path
 
 
 PLACEHOLDER_RE = re.compile(r"^\s*-\s*_\(no entries yet\)_\s*$")
+
+# Update-date line matcher that preserves any trailing YAML comment.
+# Captures: (1) `update_date: ` prefix, (2) current value token, (3) trailing
+# whitespace + optional `# comment`. Rewriting only group 2 keeps comments.
+UPDATE_DATE_RE = re.compile(r"^(\s*update_date:\s*)(\S+)(.*)$")
+
+# Canonical Title Case for the four standard index sections. When the caller
+# passes a case/whitespace variant of one of these and the section does not
+# yet exist, we create it with the canonical form to avoid drift like
+# `## entities` vs `## Entities` co-existing in the same index.
+STANDARD_SECTIONS = {
+    "entities": "Entities",
+    "concepts": "Concepts",
+    "sources": "Sources",
+    "analysis": "Analysis",
+}
+
+
+def _normalize(name: str) -> str:
+    """Fold whitespace/underscore differences and case for section matching.
+
+    Callers may pass a section as either the folder name (`open_questions`)
+    or the display heading (`Open Questions`). Both should match the same
+    scaffolded `## Open Questions` section rather than creating a duplicate.
+    """
+    return re.sub(r"[_\s]+", " ", name).strip().lower()
 
 
 def find_section_bounds(lines: list[str], section: str) -> tuple[int | None, int | None]:
@@ -38,10 +64,11 @@ def find_section_bounds(lines: list[str], section: str) -> tuple[int | None, int
     Case-insensitive on the section name; ignores trailing whitespace.
     """
     pattern = re.compile(r"^##\s+(.+?)\s*$")
+    target = _normalize(section)
     start = None
     for i, line in enumerate(lines):
         m = pattern.match(line)
-        if m and m.group(1).strip().lower() == section.strip().lower():
+        if m and _normalize(m.group(1)) == target:
             start = i
             break
     if start is None:
@@ -56,7 +83,8 @@ def find_section_bounds(lines: list[str], section: str) -> tuple[int | None, int
 
 def bump_update_date(lines: list[str], today: str) -> None:
     """If the file starts with YAML frontmatter containing `update_date:`,
-    rewrite that line in place. No-op otherwise."""
+    rewrite the value in place while preserving any trailing YAML comment
+    or indentation. No-op if there's no frontmatter or no update_date line."""
     if not lines or lines[0].strip() != "---":
         return
     for i in range(1, len(lines)):
@@ -64,7 +92,13 @@ def bump_update_date(lines: list[str], today: str) -> None:
         if stripped == "---":
             return
         if stripped.startswith("update_date:"):
-            lines[i] = f"update_date: {today}"
+            m = UPDATE_DATE_RE.match(lines[i])
+            if m:
+                lines[i] = f"{m.group(1)}{today}{m.group(3)}"
+            else:
+                # Fallback if the line doesn't match the expected shape
+                # (e.g. multi-line block scalar): rewrite conservatively.
+                lines[i] = f"update_date: {today}"
             return
 
 
@@ -84,7 +118,7 @@ def main() -> None:
     idx_path = vault / "wiki" / "index.md"
     idx_path.parent.mkdir(parents=True, exist_ok=True)
 
-    today = date.today().isoformat()
+    today = datetime.now(timezone.utc).date().isoformat()
 
     if not idx_path.exists():
         idx_path.write_text(
@@ -109,13 +143,26 @@ def main() -> None:
 
     if start is None:
         # Section does not exist — append it at the end.
+        # For the four standard sections, force canonical Title Case so we
+        # never emit `## entities` when the vault already conventionally uses
+        # `## Entities`. For non-standard sections (e.g. `open_questions`,
+        # `findings`, `decisions`, `characters`), apply the same Title Case
+        # transformation the scaffolder uses in render_index
+        # (`folder.replace("_", " ").title()`) so the auto-created heading
+        # matches what a fresh scaffold would produce. This prevents drift
+        # like `## open_questions` co-existing with `## Open Questions`.
+        canonical = STANDARD_SECTIONS.get(_normalize(args.section))
+        if canonical:
+            section_heading = canonical
+        else:
+            section_heading = _normalize(args.section).title()
         if lines and lines[-1] != "":
             lines.append("")
-        lines.append(f"## {args.section}")
+        lines.append(f"## {section_heading}")
         lines.append("")
         lines.append(new_entry)
         action = "inserted"
-        section_name_written = args.section
+        section_name_written = section_heading
     else:
         # First, drop any `_(no entries yet)_` placeholder inside this section.
         drop_indices = [

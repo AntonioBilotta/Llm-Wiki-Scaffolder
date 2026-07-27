@@ -72,7 +72,7 @@ Or `created: false, reason: <string>`.
 
 ## Gotchas
 
-- The `--content` argument is passed through verbatim as the page body. Do NOT include YAML frontmatter or an H1 heading in the content — the script wraps both.
+- The `--content` argument is passed through verbatim as the page body. Do NOT include YAML frontmatter (`---`) or an H1 heading (`# `) at the very start of the content — the script wraps both. Opening the content with `##`/`###` subsection headings or Obsidian hashtags (`#followup`) is fine.
 - Markdown content can be arbitrarily long. On some shells, extremely long argument values fail with "argument list too long". If you hit this, write the content to `/tmp/analysis-content.md` and pass via `--content "$(cat /tmp/analysis-content.md)"`.
 - Shell-escape the content carefully: single-quote wrapping fails on content containing apostrophes; double-quote wrapping requires escaping `$`, `` ` ``, `\`.
 - The script exits 0 even on refusal to overwrite — check the `created` field.
