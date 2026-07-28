@@ -40,10 +40,23 @@ def slugify(text: str) -> str:
 
 
 def parse_list_arg(raw: str) -> list[str]:
-    """Split a comma-separated string into a stripped list of non-empty items."""
+    """Split a comma-separated string into a stripped, order-preserving,
+    de-duplicated list of non-empty items.
+
+    Dedup rationale: see write_source_page.py's identical helper. Kept in
+    sync so both skills produce identical `related_sources`/`tags` YAML
+    for the same input.
+    """
     if not raw:
         return []
-    return [item.strip() for item in raw.split(",") if item.strip()]
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in raw.split(","):
+        s = item.strip()
+        if s and s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out
 
 
 def main() -> None:

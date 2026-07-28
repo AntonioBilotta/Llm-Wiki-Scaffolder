@@ -98,7 +98,27 @@ def main() -> None:
     prefix = f"## [{today}] {args.kind} | {summary_clean}"
     entry_lines: list[str] = ["", prefix]
 
-    touched = [p.strip() for p in args.touched_pages.split(",") if p.strip()]
+    # Defensive normalization for `--touched-pages`:
+    #   1. Strip surrounding `[[…]]` if the caller already wrapped a value
+    #      (would otherwise render as `[[[[foo]]]]`, breaking Obsidian
+    #      link resolution and any consumer using `\[\[([^\]]+)\]\]`).
+    #   2. Deduplicate while preserving first-occurrence order — a naive
+    #      union in the ingest orchestrator (a page listed both under
+    #      Entities and Concepts sections) would otherwise emit the same
+    #      wikilink twice.
+    seen: set[str] = set()
+    touched: list[str] = []
+    for raw in args.touched_pages.split(","):
+        p = raw.strip()
+        if not p:
+            continue
+        if p.startswith("[[") and p.endswith("]]"):
+            p = p[2:-2].strip()
+            if not p:
+                continue
+        if p not in seen:
+            seen.add(p)
+            touched.append(p)
     if touched:
         wl = ", ".join(f"[[{p}]]" for p in touched)
         entry_lines.append(f"Touched pages: {wl}")

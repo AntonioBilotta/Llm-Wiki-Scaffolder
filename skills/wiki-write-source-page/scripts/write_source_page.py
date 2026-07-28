@@ -45,10 +45,26 @@ def slugify(text: str) -> str:
 
 
 def parse_list_arg(raw: str) -> list[str]:
-    """Split a comma-separated string into a stripped list of non-empty items."""
+    """Split a comma-separated string into a stripped, order-preserving,
+    de-duplicated list of non-empty items.
+
+    Dedup rationale: `related_sources` and `tags` are surfaced verbatim in
+    the emitted YAML flow list. Duplicates would round-trip through
+    `yaml.safe_load` as `list[str]` with repeated entries — `wiki-lint-check`
+    §7 ("validate related_sources are actual pages") would then double-
+    report the same missing target, and human readers see visual noise.
+    Kept in sync with write_analysis.py's identical helper.
+    """
     if not raw:
         return []
-    return [item.strip() for item in raw.split(",") if item.strip()]
+    seen: set[str] = set()
+    out: list[str] = []
+    for item in raw.split(","):
+        s = item.strip()
+        if s and s not in seen:
+            seen.add(s)
+            out.append(s)
+    return out
 
 
 def _single_line(value: str) -> str:
