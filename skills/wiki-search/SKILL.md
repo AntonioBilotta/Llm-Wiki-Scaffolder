@@ -51,3 +51,4 @@ Empty list if no matches.
 - Ranking is heuristic (weights: page name > summary > section heading). Very short queries (1–2 chars) produce noisy results; encourage the user to be more specific.
 - The skill only reads `wiki/index.md`. Pages that exist on disk but are missing from the index are invisible — that is a known coverage gap that `wiki-lint-check` flags separately.
 - Empty result is not an error — a fresh vault legitimately has nothing to search yet.
+- **Delimiter ambiguity in the index bullet.** The canonical bullet is `- [[page]] — summary · YYYY-MM-DD` (em-dash + middle dot). User-supplied summaries can legitimately contain the same characters (e.g. `hobbit — 33 years old`). Any future scripted parser must split with `maxsplit=1` on ` — ` and rsplit with `maxsplit=1` on ` · ` — a greedy split fragments the summary.

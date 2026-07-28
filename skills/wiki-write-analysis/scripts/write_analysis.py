@@ -131,6 +131,24 @@ def main() -> None:
         }))
         sys.exit(0)
 
+    # Third guard: reject a bare `---` on its own line anywhere in the body.
+    # It is a valid Markdown thematic break (horizontal rule), but it is also
+    # a YAML document separator — any strict-YAML consumer using
+    # `safe_load_all` (Obsidian Dataview, Templater, external metadata tools)
+    # sees the file as N+1 documents instead of one, and either errors out or
+    # extracts the wrong effective frontmatter. The in-repo consumers
+    # (`wiki-read-page` splits on the first two fences only, `wiki-lint-check`
+    # uses `safe_load` on the first block) are safe, but the hazard is real
+    # enough to fail loudly at write time. Use `***` or `___` as an
+    # equivalent CommonMark horizontal rule that does not collide with YAML.
+    if re.search(r"(?m)^---\s*$", args.content):
+        print(json.dumps({
+            "created": False,
+            "reason": "content_contains_hr_fence",
+            "detail": "--content must not contain a bare `---` on its own line (YAML doc separator). Use `***` or `___` for horizontal rules.",
+        }))
+        sys.exit(0)
+
     # Bare page names (no `[[...]]` wrapping) — see wiki-conventions.
     # This is what wiki-lint-check and wiki-read-page expect: a YAML list of
     # strings, each a page name under wiki/sources/. `[[wikilink]]` syntax

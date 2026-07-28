@@ -51,6 +51,16 @@ def parse_list_arg(raw: str) -> list[str]:
     return [item.strip() for item in raw.split(",") if item.strip()]
 
 
+def _single_line(value: str) -> str:
+    """Collapse any run of whitespace (including embedded newlines) to a single
+    space, then strip. Kept in sync with update_index.py and append_log.py's
+    identical treatment of user-supplied single-line fields. Without this,
+    multi-line values in `summary.key_points` or `summary.date` produce broken
+    bullet lists where the second line orphans as a stray paragraph.
+    """
+    return re.sub(r"\s+", " ", str(value)).strip()
+
+
 def _yaml_flow_list(items: list[str]) -> str:
     """Emit a YAML flow sequence with each item JSON-quoted.
 
@@ -205,10 +215,11 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
     lines.append(prov_line)
     # Body's `- **Date**:` line uses the caller-supplied value (or the
     # normalized one when available) — this stays human-readable even for
-    # non-ISO inputs like "May 2024".
+    # non-ISO inputs like "May 2024". Whitespace-collapsed so a multi-line
+    # raw value (e.g. `date: "May\n2024"`) does not break the bullet.
     if raw_source_date:
         display_date = normalized_source_date if normalized_source_date else raw_source_date
-        lines.append(f"- **Date**: {display_date}")
+        lines.append(f"- **Date**: {_single_line(display_date)}")
     lines.append("")
 
     key_points = summary.get("key_points") or []
@@ -216,7 +227,8 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
         lines.append("## Summary")
         lines.append("")
         for kp in key_points:
-            lines.append(f"- {kp}")
+            # Collapse whitespace so a multi-line takeaway stays on one bullet.
+            lines.append(f"- {_single_line(kp)}")
         lines.append("")
 
     # Dedup happens per-section (Entities set, Concepts set) intentionally.
@@ -246,7 +258,11 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
         domain_items = {}
     for dtype, items in domain_items.items():
         # Skip keys that would duplicate the hardcoded sections above.
-        if dtype in ("entities", "concepts"):
+        # Case-fold the comparison so a title-case key (e.g. `"Entities"`)
+        # is also skipped instead of producing a duplicate `## Entities`
+        # heading. `wiki-summarize-source/SKILL.md` §3 uses lowercase keys
+        # but nothing enforces it upstream.
+        if isinstance(dtype, str) and dtype.lower() in ("entities", "concepts"):
             continue
         if not isinstance(items, list):
             warnings.append(f"domain_items.{dtype}_not_list: expected array, got {type(items).__name__}")

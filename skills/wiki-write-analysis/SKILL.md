@@ -73,6 +73,7 @@ Or `created: false, reason: <string>`.
 ## Gotchas
 
 - The `--content` argument is passed through verbatim as the page body. Do NOT include YAML frontmatter (`---`) or an H1 heading (`# `) at the very start of the content — the script wraps both. Opening the content with `##`/`###` subsection headings or Obsidian hashtags (`#followup`) is fine.
+- **No bare `---` on its own line inside `--content`.** A `---` line is a valid Markdown thematic break (horizontal rule) but also a YAML document separator: strict-YAML consumers (Obsidian Dataview, Templater, external metadata tools using `safe_load_all`) see the file as multiple documents. The script rejects with `reason: "content_contains_hr_fence"`. Use `***` or `___` — CommonMark-equivalent horizontal rules that do not collide with YAML.
 - Markdown content can be arbitrarily long. On some shells, extremely long argument values fail with "argument list too long". If you hit this, write the content to `/tmp/analysis-content.md` and pass via `--content "$(cat /tmp/analysis-content.md)"`.
 - Shell-escape the content carefully: single-quote wrapping fails on content containing apostrophes; double-quote wrapping requires escaping `$`, `` ` ``, `\`.
 - The script exits 0 even on refusal to overwrite — check the `created` field.

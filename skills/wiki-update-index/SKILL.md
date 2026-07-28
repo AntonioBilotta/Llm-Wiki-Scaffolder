@@ -27,7 +27,7 @@ Parse stdout as JSON. If the target section does not exist, the script appends i
 
 1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
 
-2. **Read** `<vault_path>/wiki/index.md`. If it does not exist, create it with a minimal frontmatter block (`type: index`, `update_date: <today>`) plus a `# Index` heading, then continue.
+2. **Read** `<vault_path>/wiki/index.md`. If it does not exist, create it with a minimal frontmatter block (`type: index`, `update_date: <today>`) plus a `# Wiki Index` heading and seed the four standard sections (`Entities`, `Concepts`, `Sources`, `Analysis`), each with a `_(no entries yet)_` placeholder. Then continue.
 
 3. **Locate the section** matching `<section>`:
    - Match `## <section>` case-insensitively.

@@ -66,3 +66,4 @@ line_prefix: "## [<date>] <kind> | ..."
 - The script always exits 0. Check the `appended` field for the outcome.
 - If `wiki/log.md` does not exist, the script creates it with a `# Log` heading. Subsequent invocations preserve it.
 - Multiple appends on the same day are fine — each entry gets its own `## [YYYY-MM-DD] ...` heading and can be grepped by date.
+- **`|` is allowed inside `--summary`.** The log line format is `## [YYYY-MM-DD] <kind> | <summary>`, and the emitted line preserves any pipes in the summary verbatim (`## [2026-07-28] ingest | step 1 | step 2`). `grep '^## \['` still returns the whole line and `.split(" | ", 1)` still yields `(kind, summary)`. Consumers doing an unbounded `.split(" | ")` would over-fragment — use `maxsplit=1`.

@@ -51,7 +51,7 @@ Parse stdout as JSON. The script (stdlib only, ~140 lines) implements the algori
    # <title>
 
    - **Provenance**: `<raw_path>` [· [original](<original_url>) if provided]
-   - **Date**: <summary.date>          # only if summary.date is set
+   - **Date**: <summary.date normalized to YYYY-MM-DD; or original string if unparseable>          # only if summary.date is set
 
    ## Summary
 
@@ -77,7 +77,7 @@ Parse stdout as JSON. The script (stdlib only, ~140 lines) implements the algori
    - [[<snake_case_item_2>]]
    ```
 
-   Omit sections that would be empty. `source_date` in frontmatter preserves the source's publication date separately from ingest date; used by wiki-lint-check stale detection. The script normalizes `summary.date` to a pure `YYYY-MM-DD` string (accepts `YYYY-MM-DD` and full ISO `YYYY-MM-DDTHH:MM:SS[Z|±HH:MM]`, extracting the date component). Unparseable values (e.g. `"May 2024"`, `"2024/05/10"`) are dropped from the frontmatter — they would otherwise break the lint stale-check sort by mixing `str`/`datetime.date`/`datetime.datetime` — but are kept verbatim in the body's `- **Date**:` line for human readability, with a warning surfaced in the return JSON.
+   Omit sections that would be empty. `source_date` in frontmatter preserves the source's publication date separately from ingest date; used by wiki-lint-check stale detection. The script normalizes `summary.date` to a pure `YYYY-MM-DD` string (accepts `YYYY-MM-DD` and full ISO `YYYY-MM-DDTHH:MM:SS[Z|±HH:MM]`, extracting the date component). Unparseable values (e.g. `"May 2024"`, `"2024/05/10"`) are dropped from the frontmatter — they would otherwise break the lint stale-check sort by mixing `str`/`datetime.date`/`datetime.datetime` — but are kept in the body's `- **Date**:` line for human readability (whitespace-collapsed to a single line), with a warning surfaced in the return JSON. When normalization succeeds, the body shows the short `YYYY-MM-DD` form.
 
 5. **Write** the file. Return the absolute path and a copy of what was written.
 
