@@ -158,7 +158,15 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
     field with the wrong Python type that was coerced to a safe default).
     """
     warnings: list[str] = []
-    title = summary["title"]
+    # Collapse whitespace in the title before it becomes the H1. Slugify
+    # already handles embedded newlines internally (they collapse to `_`),
+    # so this only affects the body's `# <title>` line — without the collapse,
+    # a multi-line title (e.g. from a summary field that captured a two-line
+    # header) produces `# Line1\nLine2`, which CommonMark renders as an H1
+    # containing only the first line + a following paragraph. Downstream
+    # readers (Obsidian, wiki-read-page, any LLM re-citing the title) see a
+    # truncated title. Callers of main() already verified `isinstance(title, str)`.
+    title = _single_line(summary["title"])
 
     # Defensive type coercion: the summary is caller-generated (often by an
     # LLM), so a schema slip is plausible. Without these guards, a string
@@ -229,13 +237,23 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
     if original_url:
         prov_line += f" · [original]({original_url})"
     lines.append(prov_line)
-    # Body's `- **Date**:` line uses the caller-supplied value (or the
-    # normalized one when available) — this stays human-readable even for
-    # non-ISO inputs like "May 2024". Whitespace-collapsed so a multi-line
-    # raw value (e.g. `date: "May\n2024"`) does not break the bullet.
-    if raw_source_date:
-        display_date = normalized_source_date if normalized_source_date else raw_source_date
-        lines.append(f"- **Date**: {_single_line(display_date)}")
+    # Body's `- **Date**:` line uses the normalized ISO value when the
+    # summary's `date` parsed cleanly (that's the best form for humans too),
+    # or falls back to the raw string when parsing failed but the raw value
+    # is still a legitimate human-readable string like "May 2024".
+    # Whitespace-collapsed so a multi-line raw value (e.g. `date: "May\n2024"`)
+    # does not break the bullet.
+    #
+    # Non-string `date` values (dict, list, int — LLM schema slip) are already
+    # captured in `warnings` by `_normalize_source_date` and dropped from the
+    # frontmatter. Skip the body line too rather than emitting a Python repr
+    # like `- **Date**: {'raw': 'May 2024'}`, which is neither ISO nor
+    # human-readable and defeats the SKILL.md contract ("kept in the body's
+    # `- **Date**:` line for human readability").
+    if isinstance(normalized_source_date, str) and normalized_source_date:
+        lines.append(f"- **Date**: {normalized_source_date}")
+    elif isinstance(raw_source_date, str) and raw_source_date.strip():
+        lines.append(f"- **Date**: {_single_line(raw_source_date)}")
     lines.append("")
 
     key_points = summary.get("key_points") or []
@@ -256,7 +274,18 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
         if items:
             seen: set[str] = set()
             slugs: list[str] = []
-            for item in items:
+            for i, item in enumerate(items):
+                # Per-item type guard: the outer coercion above ensures `items`
+                # is a list, but individual entries can still be non-strings
+                # (LLM slip: numeric IDs, nested dicts, None). `slugify` calls
+                # `unicodedata.normalize("NFKD", text)` which raises TypeError
+                # on non-str — that would violate the module's "exit 0 always,
+                # report via JSON" contract. Skip + warning instead.
+                if not isinstance(item, str):
+                    warnings.append(
+                        f"{key}[{i}]_not_string: got {type(item).__name__}"
+                    )
+                    continue
                 slug = slugify(item)
                 if slug and slug not in seen:
                     seen.add(slug)
@@ -286,7 +315,15 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
         if items:
             seen = set()
             slugs = []
-            for item in items:
+            for i, item in enumerate(items):
+                # Symmetric per-item guard with the Entities/Concepts loop
+                # above: skip non-string items so `slugify` (which requires
+                # `str`) cannot raise TypeError and violate the exit-0 contract.
+                if not isinstance(item, str):
+                    warnings.append(
+                        f"domain_items.{dtype}[{i}]_not_string: got {type(item).__name__}"
+                    )
+                    continue
                 slug = slugify(item)
                 if slug and slug not in seen:
                     seen.add(slug)

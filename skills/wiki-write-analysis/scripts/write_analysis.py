@@ -184,6 +184,17 @@ def main() -> None:
     related_yaml = "[" + ", ".join(json.dumps(x, ensure_ascii=False) for x in related) + "]"
     tags_yaml = "[" + ", ".join(json.dumps(x, ensure_ascii=False) for x in tags) + "]"
 
+    # Collapse whitespace in the title before it becomes the H1. Slugify
+    # already handles embedded newlines internally (they collapse to `_`),
+    # so this only affects the body's `# <title>` line — without the collapse,
+    # a multi-line `--title` (e.g. copy-paste from a source containing an
+    # accidental newline) produces `# Line1\nLine2`, which CommonMark renders
+    # as an H1 containing only the first line + a following paragraph.
+    # Downstream readers (Obsidian, wiki-read-page, any LLM re-citing the
+    # title) then see a truncated page title. Kept in sync with the identical
+    # collapse applied in write_source_page.py::build_page.
+    title_h1 = re.sub(r"\s+", " ", args.title).strip()
+
     lines: list[str] = [
         "---",
         "type: analysis",
@@ -193,7 +204,7 @@ def main() -> None:
         f"tags: {tags_yaml}",
         "---",
         "",
-        f"# {args.title}",
+        f"# {title_h1}",
         "",
         # Strip leading blank lines so the emitted body reads as
         # `# <title>` \n \n <first content line>, matching what the SKILL.md
