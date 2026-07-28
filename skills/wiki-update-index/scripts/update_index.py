@@ -121,6 +121,21 @@ def main() -> None:
         print(json.dumps({"updated": False, "reason": "vault_not_found", "vault_path": str(vault)}))
         sys.exit(0)
 
+    # Reject empty/whitespace-only --section and --summary. Argparse enforces
+    # they are provided at all (both `required=True`), but not their content.
+    # Without these guards:
+    #   - `--section ""` produces a `## ` heading (H2 with no text) that
+    #     wiki-search cannot classify and wiki-lint-check does not audit.
+    #   - `--summary ""` produces `- [[page]] —  · <date>` (double space)
+    #     that degrades wiki-search ranking / display of the entry.
+    # Symmetric with append_log.py's empty_summary rejection.
+    if not args.section.strip():
+        print(json.dumps({"updated": False, "reason": "empty_section"}))
+        sys.exit(0)
+    if not args.summary.strip():
+        print(json.dumps({"updated": False, "reason": "empty_summary"}))
+        sys.exit(0)
+
     idx_path = vault / "wiki" / "index.md"
     idx_path.parent.mkdir(parents=True, exist_ok=True)
 

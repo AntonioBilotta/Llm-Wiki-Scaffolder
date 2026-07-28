@@ -188,6 +188,25 @@ def build_page(summary: dict, today: str, related: list[str], tags: list[str]) -
         prov = {}
     raw_path = prov.get("raw_path", "")
     original_url = prov.get("original_url")
+    # Per-field type guards inside `provenance`. The outer guard above ensures
+    # `prov` is a dict, but its values can still be non-strings on LLM slip
+    # (e.g. `raw_path: 42`, `original_url: {"href": "..."}`). Downstream:
+    #   - `_code_span(raw_path)` does `if "`" not in value` — TypeError on int,
+    #     which would violate the module's "exit 0 always" contract.
+    #   - `original_url` is interpolated into `[original]({url})` — non-strings
+    #     render as Python repr (e.g. `[original]({'href': '...'})`) which is
+    #     not a valid markdown link.
+    # In both cases: drop the value, warn, keep the page write moving.
+    if raw_path and not isinstance(raw_path, str):
+        warnings.append(
+            f"provenance.raw_path_not_string: got {type(raw_path).__name__}"
+        )
+        raw_path = ""
+    if original_url is not None and not isinstance(original_url, str):
+        warnings.append(
+            f"provenance.original_url_not_string: got {type(original_url).__name__}"
+        )
+        original_url = None
     raw_source_date = summary.get("date")
     normalized_source_date, date_warning = _normalize_source_date(raw_source_date)
     if date_warning:
