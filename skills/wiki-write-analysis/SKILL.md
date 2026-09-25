@@ -11,10 +11,10 @@ Create `<vault_path>/wiki/analysis/<slug>.md` with the provided content. Blast r
 
 ## Invocation
 
-Run the bundled script via the platform terminal tool:
+Run the bundled script via the platform terminal tool. `<skill-dir>` is the directory containing this SKILL.md (Claude Code shows it as the skill's base directory when the skill loads; after install it is `~/.claude/skills/<name>/`, `~/.copilot/skills/<name>/` or `~/.agents/skills/<name>/`). On Windows use `python` or `py -3` if `python3` is not on PATH.
 
 ```bash
-python3 scripts/write_analysis.py \
+python3 <skill-dir>/scripts/write_analysis.py \
   --vault-path "<absolute vault path>" \
   --title "<analysis title>" \
   --content "<markdown body, verbatim>" \
@@ -26,7 +26,7 @@ Parse stdout as JSON. The script (stdlib only) writes the file with standard fro
 
 ## Algorithm
 
-1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
+1. **Resolve `vault_path`** — required argument, passed by the calling workflow (`wiki-ingest`, `wiki-query`, `wiki-lint`, or a vault agent). If you are invoked directly without it, resolve it with the rule in step 1 of the `wiki-ingest` Preflight: argument → `## Vault` signpost in context (`.github/copilot-instructions.md` or `AGENTS.md`) → current folder if it is a vault root → ask the user.
 
 2. **Compute the target filename:**
    - Snake_case slug from `title`.

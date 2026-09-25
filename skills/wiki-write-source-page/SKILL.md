@@ -11,10 +11,10 @@ Create `<vault_path>/wiki/sources/<slug>.md` with the provided summary. Blast ra
 
 ## Invocation
 
-Run the bundled script via the platform terminal tool:
+Run the bundled script via the platform terminal tool. `<skill-dir>` is the directory containing this SKILL.md (Claude Code shows it as the skill's base directory when the skill loads; after install it is `~/.claude/skills/<name>/`, `~/.copilot/skills/<name>/` or `~/.agents/skills/<name>/`). On Windows use `python` or `py -3` if `python3` is not on PATH.
 
 ```bash
-python3 scripts/write_source_page.py \
+python3 <skill-dir>/scripts/write_source_page.py \
   --vault-path "<absolute vault path>" \
   --summary-json '<compact JSON string>' \
   [--related-sources "src_a,src_b"] \
@@ -27,7 +27,7 @@ Parse stdout as JSON. The script (stdlib only, ~140 lines) implements the algori
 
 ## Algorithm
 
-1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
+1. **Resolve `vault_path`** — required argument, passed by the calling workflow (`wiki-ingest`, `wiki-query`, `wiki-lint`, or a vault agent). If you are invoked directly without it, resolve it with the rule in step 1 of the `wiki-ingest` Preflight: argument → `## Vault` signpost in context (`.github/copilot-instructions.md` or `AGENTS.md`) → current folder if it is a vault root → ask the user.
 
 2. **Parse `summary`** — a JSON structure matching the return shape of `wiki-summarize-source` (passed via `--summary-json`, parsed with `json.loads`; YAML is not accepted).
 
@@ -103,7 +103,7 @@ Current `warnings` values include `source_date_not_iso: ...` (date could not be 
 
 ## Gotchas
 
-- The invocation assumes CWD is the skill directory. If the CWD differs at runtime, prefix the script path with the absolute skill path (typically `~/.copilot/skills/wiki-write-source-page/scripts/write_source_page.py` after install).
+- Always call the script through its absolute path (`<skill-dir>/scripts/write_source_page.py`); do not rely on the current working directory being the skill directory — it usually is the vault or workspace root.
 - Shell-escape the `--summary-json` argument carefully. Nested quotes or special characters in `key_points` or `title` can break the shell. For complex summaries, write to a temp file and pass via `--summary-json "$(cat /tmp/summary.json)"`.
 - The script exits 0 even on refusal to overwrite — check the `created` field in the JSON, not the shell exit code.
 - To *update* an existing source page (not create), use the platform `edit` tool directly. This skill only creates.

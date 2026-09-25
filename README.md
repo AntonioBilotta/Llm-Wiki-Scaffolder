@@ -135,15 +135,31 @@ Removes installed files and the VS Code user prompt. Vaults created with the sca
         karpathy_llm_wiki_pattern.md    # pinned copy of the pattern doc
         instructions/wiki-conventions.instructions.md
         agents/wiki-{reader,maintainer,auditor}.agent.md   # OPTIONAL per domain
-    AGENTS.md                # multi-assistant bridge (Codex, OpenCode, Aider, Cursor)
+    AGENTS.md                # signpost for Claude Code, Codex, OpenCode, Aider, Cursor (## Vault path)
+    CLAUDE.md                # `@AGENTS.md` import, loaded by Claude Code
     .gitignore
 ```
 
-**Vault-level prompts are NOT scaffolded under Model D** — the `/wiki-ingest`, `/wiki-lint`, `/wiki-query` slash-commands are installed at user level and work from any workspace containing an LLM Wiki vault. The vault path is read from the auto-loaded `.github/copilot-instructions.md` (`## Vault / **Path:**` field), which the scaffolder writes at vault creation time — see [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md).
+**Vault-level prompts are NOT scaffolded under Model D** — the `/wiki-ingest`, `/wiki-lint`, `/wiki-query` slash-commands are installed at user level and work from any workspace containing an LLM Wiki vault. The vault path is read from the `## Vault / **Path:**` field of the signpost the runtime loads — `.github/copilot-instructions.md` in VS Code Copilot, `AGENTS.md` (via `CLAUDE.md`) in Claude Code — which the scaffolder writes at vault creation time; if that absolute path does not exist in the current environment, the signpost's own folder is used — see [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md).
 
 **Agents are optional per domain**: `business` and `personal` include them by default (stricter roles for sensitive data), `research`/`development`/`reading`/`learning`/`hobby` do not. Override with `--with-agents` or `--minimal` at scaffold time.
 
 Content folders (`wiki/entities/`, `wiki/concepts/`, `wiki/sources/`, `wiki/analysis/`, extra folders) stay empty on scaffold. They are populated by the maintainer role on the first `/wiki-ingest`. This preserves the Karpathy invariant that the wiki is *compounded* from sources, not pre-filled.
+
+## Using the skills with Claude
+
+The 11 wiki-* skills are runtime-neutral: the same files serve VS Code Copilot, Claude Code and claude.ai.
+
+- **Claude Code** — `bin/install.sh` / `install.ps1` already copy the skills to `~/.claude/skills/`. Open a Claude Code session in the vault folder: `CLAUDE.md` imports `AGENTS.md`, which carries the vault path. Use `/wiki-ingest raw/<file>`, `/wiki-query "<question>"`, `/wiki-lint`. Existing vaults get `CLAUDE.md` with `scaffold.py --upgrade`; the `## Vault` block in `AGENTS.md` is optional (without it, the skills use the session folder when it is a vault root).
+- **claude.ai** (web, desktop, mobile, Cowork) — build one archive per skill and upload all 11 from the skill settings:
+
+  ```bash
+  python3 bin/package_skills.py        # → dist/claude-ai/wiki-*.zip
+  ```
+
+  The archives drop the Copilot/Claude Code-only frontmatter keys (`argument-hint`, `user-invocable`) and keep the bundled scripts. The vault must be a folder the session can read and write (a folder connected from your computer), and the scripts need Python 3 where the session runs them.
+
+Source fidelity: pages must copy numbers, dates and quotes verbatim from `raw/`; `wiki-lint` checks it with `skills/wiki-lint-check/scripts/check_evidence.py`. Tests: `python3 -m unittest discover -s tests -v`.
 
 ## Domain types
 

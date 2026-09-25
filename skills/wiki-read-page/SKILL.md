@@ -11,7 +11,7 @@ Load a wiki page's frontmatter and body for downstream reasoning.
 
 ## Algorithm
 
-1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
+1. **Resolve `vault_path`** — required argument, passed by the calling workflow (`wiki-ingest`, `wiki-query`, `wiki-lint`, or a vault agent). If you are invoked directly without it, resolve it with the rule in step 1 of the `wiki-ingest` Preflight: argument → `## Vault` signpost in context (`.github/copilot-instructions.md` or `AGENTS.md`) → current folder if it is a vault root → ask the user.
 
 2. **Locate the file.** The `page` argument omits the `.md` extension and typically omits the folder — search inside `<vault_path>/wiki/**/*.md` for a match:
    - Try in priority order: `wiki/entities/`, `wiki/concepts/`, `wiki/sources/`, `wiki/analysis/`, then any domain-specific content folders (e.g. `wiki/decisions/`, `wiki/characters/`).

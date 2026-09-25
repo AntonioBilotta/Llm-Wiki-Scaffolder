@@ -12,7 +12,9 @@ Karpathy pattern invariants enforced:
   - wiki/ is LLM-owned. The script creates only the navigation files
     (index.md, log.md, overview.md) and leaves all content folders
     (entities/, concepts/, sources/, analysis/, extra folders) empty.
-  - The signpost (.github/copilot-instructions.md) stays minimal.
+  - The signposts (.github/copilot-instructions.md for Copilot, AGENTS.md
+    for other assistants, CLAUDE.md importing AGENTS.md for Claude Code)
+    stay minimal.
     Conventions live in .github/instructions/wiki-conventions.instructions.md.
 
 Requires Python 3.8+. Standard library only.
@@ -613,6 +615,14 @@ def build_plan(
     ops.append(FileOp(
         vault / "AGENTS.md",
         substitute((templates_dir / "AGENTS.md").read_text(encoding="utf-8"), mapping),
+        "text",
+    ))
+    # CLAUDE.md is a one-line import of AGENTS.md so Claude Code sessions opened
+    # in the vault load the same signpost (vault path, conventions pointer).
+    # No placeholders by design: vault facts live in AGENTS.md only.
+    ops.append(FileOp(
+        vault / "CLAUDE.md",
+        (templates_dir / "CLAUDE.md").read_text(encoding="utf-8"),
         "text",
     ))
     ops.append(FileOp(
