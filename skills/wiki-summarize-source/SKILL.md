@@ -11,7 +11,7 @@ Produce a structured summary of a raw source, ready to be consumed by ingest orc
 
 ## Algorithm
 
-1. **Resolve `vault_path`** (from `vault_path` argument, required — read from the workspace's `.github/copilot-instructions.md` under `## Vault / **Path:**`).
+1. **Resolve `vault_path`** — required argument, passed by the calling workflow (`wiki-ingest`, `wiki-query`, `wiki-lint`, or a vault agent). If you are invoked directly without it, resolve it with the rule in step 1 of the `wiki-ingest` Preflight: argument → `## Vault` signpost in context (`.github/copilot-instructions.md` or `AGENTS.md`) → current folder if it is a vault root → ask the user.
 
 2. **Locate the source** at `<vault_path>/<source_path>` (or `<source_path>` if absolute).
    - Text/Markdown/HTML files: read directly.
@@ -22,7 +22,7 @@ Produce a structured summary of a raw source, ready to be consumed by ingest orc
    - **`provenance.raw_path`**: absolute path under `<vault_path>/raw/`.
    - **`provenance.original_url`**: value of `source_url`, `url`, or `link` in source frontmatter, if any; else `null`.
    - **`date`**: value of `date` in source frontmatter if present; else filesystem `mtime` formatted as `YYYY-MM-DD`.
-   - **`key_points`**: 3–7 bulleted takeaways, each a complete sentence, extracted from the source's main claims. Prefer the source's own wording; do not synthesize claims the source does not make.
+   - **`key_points`**: 3–7 bulleted takeaways, each a complete sentence, extracted from the source's main claims. Prefer the source's own wording; do not synthesize claims the source does not make. **Source fidelity:** every number, date and direct quote in a key point is copied exactly as it appears in the source (`42K` stays `42K`, `v2.1.80` stays `v2.1.80`, a quote keeps its wording). Downstream pages copy these values, and `wiki-lint-check` greps them back in the raw file.
    - **`entities`**: proper nouns — organizations, products, people, places — likely to warrant a wiki entity page. Extract only names the source explicitly mentions.
    - **`concepts`**: recurring themes, technical concepts, ideas the source elaborates on. Same "explicit-mention only" rule.
    - **`domain_items`**: instances of domain-specific types the vault has configured (decisions, requirements, characters, themes, findings, hypotheses, authors, arguments, goals, patterns, reflections, processes, initiatives, topics — check `<vault_path>/.github/instructions/wiki-conventions.instructions.md` for the enabled types). Keyed by type name.
@@ -49,6 +49,7 @@ duplicate_of: <existing page name>   # optional, only if a duplicate was detecte
 
 - **Output-only, no writes.** This skill never modifies any file — it returns a summary for a downstream skill (typically `wiki-write-source-page`) to consume.
 - **Never invent** entities, concepts, or facts. Extract only what is explicit in the source.
+- **Never reformat literals.** Do not round, convert units, expand abbreviations (`42K` → `42,000`) or re-format dates in `key_points`: the grounding check matches them verbatim.
 - **Do not read wiki pages** — this skill is scoped to the source alone. Cross-reference discovery is the ingest orchestrator's job.
 
 ## Gotchas

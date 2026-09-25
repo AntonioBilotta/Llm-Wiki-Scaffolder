@@ -21,7 +21,7 @@ flowchart TB
         R_INSTALL["bin/install.sh, install.ps1<br/>(idempotent)"]
         R_SCAFFOLD["bin/scaffold.py<br/>(Python 3.8+, stdlib only)"]
         R_PROMPTS["prompts/<br/>new-llm-wiki (scaffold only)"]
-        R_SKILLS["skills/<br/>11 wiki-* skills<br/>(3 orchestration + 8 atomic;<br/>4 atomic bundle scripts/*.py)"]
+        R_SKILLS["skills/<br/>11 wiki-* skills<br/>(3 orchestration + 8 atomic;<br/>5 atomic bundle scripts/*.py)"]
         R_TEMPLATES["templates/<br/>├─ agents/ (reader, maintainer, auditor)<br/>├─ instructions/ (conventions)<br/>├─ overview/ (per domain)<br/>└─ AGENTS.md, copilot-instructions.md,<br/>   karpathy_llm_wiki_pattern.md"]
     end
 
@@ -164,18 +164,18 @@ Rationale detailed in [ADR-0001](docs/decisions/0001-python-stdlib-only.md) and 
 
 | Skill | Purpose |
 |---|---|
-| `wiki-ingest` | Full INGEST workflow: summarize → write source page → cross-refs → index → log. Single-source + batch (folder) modes. |
+| `wiki-ingest` | Full INGEST workflow: summarize → triage (New / Update / Disputed / No material) → write source page → cross-refs with source-fidelity rule → index → log. Single-source + batch (folder) modes. |
 | `wiki-query` | Full QUERY workflow: search → read pages → synthesize with `[[wikilink]]` citations → optional archival. |
-| `wiki-lint` | Full LINT workflow: run 7 audits (MD + JSON) → auto-repair unambiguous frontmatter → log. |
+| `wiki-lint` | Full LINT workflow: run 8 audits incl. mechanical source-fidelity check (MD + JSON) → auto-repair unambiguous frontmatter → log. |
 
-**Atomic skills** (8, hidden from `/` picker via `user-invocable: false`): single-purpose primitives composed by orchestrators and agents. Four bundle a stdlib-only Python script under `scripts/` for single-file, blast-radius-bounded write operations. The vault path is not detected — it is read from the auto-loaded `.github/copilot-instructions.md` under `## Vault / **Path:**` (see [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md)) and passed as `vault_path` argument to every skill by the caller.
+**Atomic skills** (8, hidden from `/` picker via `user-invocable: false`): single-purpose primitives composed by orchestrators and agents. Four bundle a stdlib-only Python script under `scripts/` for single-file, blast-radius-bounded write operations; `wiki-lint-check` bundles a read-only one (`check_evidence.py`). The vault path is not detected — it is read from the auto-loaded `.github/copilot-instructions.md` under `## Vault / **Path:**` (see [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md)) and passed as `vault_path` argument to every skill by the caller.
 
 | Skill | Kind | Purpose |
 |---|---|---|
-| `wiki-search` | pure reasoning | Rank pages in `wiki/index.md` by relevance |
+| `wiki-search` | pure reasoning | Rank pages from `wiki/index.md`, then full-text search every page (synonyms) for what the index misses |
 | `wiki-read-page` | pure reasoning | Read a wiki page with parsed frontmatter + wikilinks |
 | `wiki-summarize-source` | pure reasoning | Produce a structured summary of a `raw/` source |
-| `wiki-lint-check` | pure reasoning | Health-check the wiki (JSON or MD report) |
+| `wiki-lint-check` | reasoning + Python script | Health-check the wiki (JSON or MD report); `check_evidence.py` greps numbers/dates/quotes back in `raw/` |
 | `wiki-write-source-page` | + Python script | Create one `wiki/sources/<slug>.md` from a summary |
 | `wiki-write-analysis` | + Python script | Create one `wiki/analysis/<slug>.md` from a synthesis |
 | `wiki-update-index` | + Python script | Add/update one row in `wiki/index.md` |
