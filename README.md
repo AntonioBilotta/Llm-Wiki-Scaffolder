@@ -148,10 +148,10 @@ Content folders (`wiki/entities/`, `wiki/concepts/`, `wiki/sources/`, `wiki/anal
 
 ## Using the skills with Claude
 
-The 11 wiki-* skills are runtime-neutral: the same files serve VS Code Copilot, Claude Code and claude.ai.
+The 12 wiki-* skills are runtime-neutral: the same files serve VS Code Copilot, Claude Code and claude.ai. `wiki-init` is the skill form of `/new-llm-wiki`: it creates or upgrades a vault and carries its own copy of `scaffold.py` and `templates/` (bundled by the installers and by `package_skills.py` from the repo, never edited in place), so it also works where `~/.config/llm-wiki` or `%APPDATA%\llm-wiki` is not reachable. The VS Code prompt stays for now.
 
-- **Claude Code** — `bin/install.sh` / `install.ps1` already copy the skills to `~/.claude/skills/`. Open a Claude Code session in the vault folder: `CLAUDE.md` imports `AGENTS.md`, which carries the vault path. Use `/wiki-ingest raw/<file>`, `/wiki-query "<question>"`, `/wiki-lint`. Existing vaults get `CLAUDE.md` with `scaffold.py --upgrade`; the `## Vault` block in `AGENTS.md` is optional (without it, the skills use the session folder when it is a vault root).
-- **claude.ai** (web, desktop, mobile, Cowork) — build one archive per skill and upload all 11 from the skill settings:
+- **Claude Code** — `bin/install.sh` / `install.ps1` already copy the skills to `~/.claude/skills/`. Create a vault with `/wiki-init <path>`, then open a Claude Code session in the vault folder: `CLAUDE.md` imports `AGENTS.md`, which carries the vault path. Use `/wiki-ingest raw/<file>`, `/wiki-query "<question>"`, `/wiki-lint`. Existing vaults get `CLAUDE.md` with `scaffold.py --upgrade`; the `## Vault` block in `AGENTS.md` is optional (without it, the skills use the session folder when it is a vault root).
+- **claude.ai** (web, desktop, mobile, Cowork) — build one archive per skill and upload all 12 from Settings → Capabilities → Skills (code execution must be on):
 
   ```bash
   python3 bin/package_skills.py        # → dist/claude-ai/wiki-*.zip

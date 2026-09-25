@@ -258,6 +258,17 @@ if [ "$SKIP_SKILLS" = "false" ]; then
                 rsync -a --delete \
                     --exclude='.DS_Store' --exclude='Thumbs.db' --exclude='.git*' \
                     "$src/" "$dest/"
+                # wiki-init is self-contained: bundle the scaffolder and its
+                # templates so it works where ~/.config/llm-wiki is not
+                # reachable (the repo stays the single source of truth).
+                if [ "$(basename "$src")" = "wiki-init" ]; then
+                    mkdir -p -- "$dest/scripts"
+                    cp -- "$REPO_ROOT/bin/scaffold.py" "$dest/scripts/scaffold.py"
+                    chmod 0755 "$dest/scripts/scaffold.py"
+                    rsync -a --delete \
+                        --exclude='.DS_Store' --exclude='Thumbs.db' --exclude='.git*' \
+                        "$REPO_ROOT/templates/" "$dest/templates/"
+                fi
                 echo "  installed skill: $dest/"
             fi
         done

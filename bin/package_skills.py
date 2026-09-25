@@ -8,6 +8,7 @@ SKILL.md frontmatter against the Agent Skills spec keys only. This script
 builds those archives without changing the source skills:
 
   - one archive per skills/wiki-*/ folder:  dist/claude-ai/<name>.zip
+  - wiki-init also gets bin/scaffold.py and templates/ (see BUNDLES)
   - archive layout:  <name>/SKILL.md, <name>/scripts/..., other files as-is
   - frontmatter keys outside the spec (argument-hint, user-invocable, ...)
     are dropped from the packaged SKILL.md only; the body is untouched
@@ -35,6 +36,12 @@ from typing import List, Optional, Tuple
 REPO_ROOT = Path(__file__).resolve().parents[1]
 SPEC_KEYS = ("name", "description", "license", "allowed-tools", "metadata", "compatibility")
 SKIP_NAMES = {".DS_Store", "Thumbs.db", "__pycache__"}
+# Repo files copied into a skill's archive at build time (the installers do
+# the same). Keeps the repo the single source of truth: wiki-init runs the
+# same scaffold.py and templates that bin/ and templates/ hold.
+BUNDLES = {
+    "wiki-init": [("bin/scaffold.py", "scripts/scaffold.py"), ("templates", "templates")],
+}
 FIXED_DATE = (2026, 1, 1, 0, 0, 0)
 
 
@@ -101,14 +108,24 @@ def package(skill_dir: Path, out_dir: Path) -> dict:
     packaged_md = "---\n" + "\n".join(kept) + "\n---\n" + body
     out_dir.mkdir(parents=True, exist_ok=True)
     archive = out_dir / f"{name}.zip"
-    files = sorted(
-        p for p in skill_dir.rglob("*")
-        if p.is_file() and not any(part in SKIP_NAMES for part in p.relative_to(skill_dir).parts)
-        and p.suffix != ".pyc"
-    )
+    entries = {}  # arcname relative to the skill folder -> source path
+    for p in skill_dir.rglob("*"):
+        rel = p.relative_to(skill_dir)
+        if p.is_file() and p.suffix != ".pyc" and not any(part in SKIP_NAMES or part.startswith(".git") for part in rel.parts):
+            entries[rel.as_posix()] = p
+    for src_rel, dest_rel in BUNDLES.get(skill_dir.name, []):
+        src = REPO_ROOT / src_rel
+        if src.is_file():
+            entries[dest_rel] = src
+        else:
+            for p in src.rglob("*"):
+                rel = p.relative_to(src)
+                if p.is_file() and not any(part in SKIP_NAMES or part.startswith(".git") for part in rel.parts):
+                    entries[f"{dest_rel}/{rel.as_posix()}"] = p
+    files = [(k, entries[k]) for k in sorted(entries)]
     with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-        for path in files:
-            arcname = f"{name}/{path.relative_to(skill_dir).as_posix()}"
+        for rel_name, path in files:
+            arcname = f"{name}/{rel_name}"
             info = zipfile.ZipInfo(arcname, date_time=FIXED_DATE)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = (0o755 if path.suffix == ".py" else 0o644) << 16

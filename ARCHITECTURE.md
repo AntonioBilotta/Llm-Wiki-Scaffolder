@@ -21,7 +21,7 @@ flowchart TB
         R_INSTALL["bin/install.sh, install.ps1<br/>(idempotent)"]
         R_SCAFFOLD["bin/scaffold.py<br/>(Python 3.8+, stdlib only)"]
         R_PROMPTS["prompts/<br/>new-llm-wiki (scaffold only)"]
-        R_SKILLS["skills/<br/>11 wiki-* skills<br/>(3 orchestration + 8 atomic;<br/>5 atomic bundle scripts/*.py)"]
+        R_SKILLS["skills/<br/>12 wiki-* skills<br/>(wiki-init + 3 orchestration + 8 atomic;<br/>5 atomic bundle scripts/*.py)"]
         R_TEMPLATES["templates/<br/>├─ agents/ (reader, maintainer, auditor)<br/>├─ instructions/ (conventions)<br/>├─ overview/ (per domain)<br/>└─ AGENTS.md, copilot-instructions.md,<br/>   karpathy_llm_wiki_pattern.md"]
     end
 
@@ -103,7 +103,7 @@ flowchart TB
 - Syncs `templates/` bidirectionally to `~/.config/llm-wiki/templates/` (`rsync --delete` on Unix, `Copy-Item` on Windows) — files removed from the repo also disappear from the runtime copy.
 - Installs `scaffold.py` (`0755`) to `~/.config/llm-wiki/bin/`.
 - Installs 4 user-level prompts (`0644`) — `new-llm-wiki`, `wiki-ingest`, `wiki-lint`, `wiki-query` — to the VS Code user prompts folder.
-- Installs the 11 wiki-* skills (3 orchestration + 8 atomic) to three destinations: `~/.copilot/skills/`, `~/.claude/skills/`, `~/.agents/skills/` (for cross-tool composability with Copilot CLI, Claude Code, and other agent runtimes).
+- Installs the 12 wiki-* skills (`wiki-init` with bundled `scaffold.py` + `templates/`, 3 orchestration + 8 atomic) to three destinations: `~/.copilot/skills/`, `~/.claude/skills/`, `~/.agents/skills/` (for cross-tool composability with Copilot CLI, Claude Code, and other agent runtimes).
 - Cross-platform detection of the VS Code prompts folder (macOS/Linux/Windows, stable/Insiders).
 - Legacy cleanup: removes obsolete VS Code prompts (`new_llm_wiki_vault.prompt.md`) and any vault-level `.github/prompts/wiki-*.prompt.md` on `--upgrade` (these lived at vault level pre-Model D).
 - Sanity check: `scaffold.py --help` must run cleanly.
@@ -158,7 +158,7 @@ Rationale detailed in [ADR-0001](docs/decisions/0001-python-stdlib-only.md) and 
 
 ### 4. Skills layer (NEW under Model D) — [skills/](skills/)
 
-**What it is:** 11 user-level capabilities packaged as `SKILL.md` files, organized in two sub-layers per [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md):
+**What it is:** 12 user-level capabilities: `wiki-init` (skill form of `/new-llm-wiki`, runtime-neutral, explicit invocation only) plus 11 packaged as `SKILL.md` files, organized in two sub-layers per [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md):
 
 **Orchestration skills** (3, visible in `/` picker): compose atomic skills into canonical workflows. These replace the earlier `/wiki-ingest`, `/wiki-lint`, `/wiki-query` prompts (see [ADR-0007](docs/decisions/0007-ingest-lint-remain-prompts.md) erratum).
 
@@ -301,7 +301,7 @@ flowchart TB
 
 ### 5. Vault runtime layer — LLM-driven
 
-Once scaffolded, the vault operates with 1 user-level slash-prompt (`/new-llm-wiki`) + 11 user-level skills (3 orchestration + 8 atomic) + (optionally) 3 vault-level role agents that delegate to the orchestration skills. See [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md) for the 3-layer composition rationale.
+Once scaffolded, the vault operates with 1 user-level slash-prompt (`/new-llm-wiki`) + 12 user-level skills (`wiki-init` + 3 orchestration + 8 atomic) + (optionally) 3 vault-level role agents that delegate to the orchestration skills. See [ADR-0012](docs/decisions/0012-orchestration-skills-and-agent-delegation.md) for the 3-layer composition rationale.
 
 | Component | Level | Type | Executed by | Determinism |
 |---|---|---|---|---|

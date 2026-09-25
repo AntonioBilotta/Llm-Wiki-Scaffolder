@@ -297,6 +297,24 @@ if (-not $NoSkills) {
                 Remove-Item -Recurse -Force $dest
             }
             Copy-Item -Recurse -Force $_.FullName $dest
+            # wiki-init is self-contained: bundle the scaffolder and its
+            # templates so it works where %APPDATA%\llm-wiki is not reachable
+            # (the repo stays the single source of truth).
+            if ($_.Name -eq "wiki-init") {
+                $BundleScripts = Join-Path $dest "scripts"
+                New-Item -ItemType Directory -Force -Path $BundleScripts | Out-Null
+                Copy-Item -Force (Join-Path $RepoRoot "bin\scaffold.py") (Join-Path $BundleScripts "scaffold.py")
+                $BundleTemplates = Join-Path $dest "templates"
+                $TemplatesRoot = Join-Path $RepoRoot "templates"
+                Get-ChildItem $TemplatesRoot -Recurse -File |
+                    Where-Object { $_.Name -notin @('.DS_Store', 'Thumbs.db') -and $_.Name -notlike '.git*' } |
+                    ForEach-Object {
+                        $rel = $_.FullName.Substring($TemplatesRoot.Length + 1)
+                        $target = Join-Path $BundleTemplates $rel
+                        New-Item -ItemType Directory -Force -Path (Split-Path $target -Parent) | Out-Null
+                        Copy-Item -Force $_.FullName $target
+                    }
+            }
             Write-Host "  installed skill: $dest\"
         }
     }
