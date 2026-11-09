@@ -159,7 +159,7 @@ The 12 wiki-* skills are runtime-neutral: the same files serve VS Code Copilot, 
 
   The archives drop the Copilot/Claude Code-only frontmatter keys (`argument-hint`, `user-invocable`) and keep the bundled scripts. The vault must be a folder the session can read and write (a folder connected from your computer), and the scripts need Python 3 where the session runs them.
 
-Source fidelity: pages must copy numbers, dates and quotes verbatim from `raw/`; `wiki-lint` checks it with `skills/wiki-lint-check/scripts/check_evidence.py`. Tests: `python3 -m unittest discover -s tests -v`.
+Source fidelity: pages must copy numbers, dates and quotes verbatim from `raw/`; `wiki-lint` checks it with `skills/wiki-lint-check/scripts/check_evidence.py`. Link integrity (duplicate page names that make `[[wikilinks]]` ambiguous, broken wikilinks) is checked by `skills/wiki-lint-check/scripts/check_links.py`. Tests: `python3 -m unittest discover -s tests -v`.
 
 ## Domain types
 

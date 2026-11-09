@@ -166,16 +166,16 @@ Rationale detailed in [ADR-0001](docs/decisions/0001-python-stdlib-only.md) and 
 |---|---|
 | `wiki-ingest` | Full INGEST workflow: summarize → triage (New / Update / Disputed / No material) → write source page → cross-refs with source-fidelity rule → index → log. Single-source + batch (folder) modes. |
 | `wiki-query` | Full QUERY workflow: search → read pages → synthesize with `[[wikilink]]` citations → optional archival. |
-| `wiki-lint` | Full LINT workflow: run 8 audits incl. mechanical source-fidelity check (MD + JSON) → auto-repair unambiguous frontmatter → log. |
+| `wiki-lint` | Full LINT workflow: run 9 audits incl. mechanical source-fidelity and link-integrity checks (MD + JSON) → auto-repair unambiguous frontmatter → log. |
 
-**Atomic skills** (8, hidden from `/` picker via `user-invocable: false`): single-purpose primitives composed by orchestrators and agents. Four bundle a stdlib-only Python script under `scripts/` for single-file, blast-radius-bounded write operations; `wiki-lint-check` bundles a read-only one (`check_evidence.py`). The vault path is not detected — it is read from the auto-loaded `.github/copilot-instructions.md` under `## Vault / **Path:**` (see [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md)) and passed as `vault_path` argument to every skill by the caller.
+**Atomic skills** (8, hidden from `/` picker via `user-invocable: false`): single-purpose primitives composed by orchestrators and agents. Four bundle a stdlib-only Python script under `scripts/` for single-file, blast-radius-bounded write operations; `wiki-lint-check` bundles two read-only ones (`check_evidence.py`, `check_links.py`; see [ADR-0014](docs/decisions/0014-link-integrity-as-bundled-script.md)). The vault path is not detected — it is read from the auto-loaded `.github/copilot-instructions.md` under `## Vault / **Path:**` (see [ADR-0010](docs/decisions/0010-eliminate-wiki-detect-vault.md)) and passed as `vault_path` argument to every skill by the caller.
 
 | Skill | Kind | Purpose |
 |---|---|---|
 | `wiki-search` | pure reasoning | Rank pages from `wiki/index.md`, then full-text search every page (synonyms) for what the index misses |
 | `wiki-read-page` | pure reasoning | Read a wiki page with parsed frontmatter + wikilinks |
 | `wiki-summarize-source` | pure reasoning | Produce a structured summary of a `raw/` source |
-| `wiki-lint-check` | reasoning + Python script | Health-check the wiki (JSON or MD report); `check_evidence.py` greps numbers/dates/quotes back in `raw/` |
+| `wiki-lint-check` | reasoning + Python scripts | Health-check the wiki (JSON or MD report); `check_evidence.py` greps numbers/dates/quotes back in `raw/`, `check_links.py` finds duplicate page names and broken wikilinks |
 | `wiki-write-source-page` | + Python script | Create one `wiki/sources/<slug>.md` from a summary |
 | `wiki-write-analysis` | + Python script | Create one `wiki/analysis/<slug>.md` from a synthesis |
 | `wiki-update-index` | + Python script | Add/update one row in `wiki/index.md` |

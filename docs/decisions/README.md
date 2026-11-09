@@ -47,3 +47,4 @@ Options rejected, with reasons.
 | [0011](0011-skill-token-optimization-strategies.md) | Skill token optimization strategies (deferred) | Superseded by ADR-0010 |
 | [0012](0012-orchestration-skills-and-agent-delegation.md) | Convert wiki-{ingest,lint,query} prompts to orchestration skills; agents delegate to skills | Accepted |
 | [0013](0013-competitive-analysis-and-adoption-plan.md) | Competitive analysis (vanillaflava, nvk, InfraNodus) and idea-adoption ranking | Accepted |
+| [0014](0014-link-integrity-as-bundled-script.md) | Link integrity as a second bundled script in wiki-lint-check | Accepted |
